@@ -40,7 +40,7 @@
     "react-native-css-interop": "0.2.4",
     "react-native-gesture-handler": "~2.16.2",
     "react-native-mmkv": "^3.0.1",
-    "react-native-reanimated": "~3.10.1",
+    "react-native-reanimated": "~3.16.7",
     "react-native-safe-area-context": "~4.10.5",
     "react-native-screens": "~3.31.1",
     "react-native-web": "~0.19.12",
@@ -51,6 +51,7 @@
   },
   "devDependencies": {
     "@types/react": "~18.2.45",
+    "autoprefixer": "^10.4.19",
     "babel-plugin-module-resolver": "^5.0.2",
     "eslint": "^8.57.0",
     "eslint-config-expo": "~10.0.0",
