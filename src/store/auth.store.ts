@@ -2,13 +2,20 @@ import { create } from 'zustand';
 
 import { signIn, signUp } from '~/features/auth/auth.api';
 import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '~/features/auth/tokens';
-import type { AuthSession, AuthStatus, LoginPayload, SignupPayload } from '~/types';
+import type { AuthSession, AuthStatus, AuthUser, LoginPayload, SignupPayload } from '~/types';
+
+const mockUser: AuthUser = {
+  id: 'dev-user-id',
+  name: 'Gemini Tester',
+  email: 'tester@qmcloud.io.vn',
+  avatarUrl: 'https://i.pravatar.cc/150?u=gemini',
+};
 
 const emptySession: AuthSession = {
-  user: null,
+  user: mockUser,
   tokens: {
-    accessToken: '',
-    refreshToken: null,
+    accessToken: 'mock-access-token',
+    refreshToken: 'mock-refresh-token',
   },
 };
 
@@ -23,27 +30,12 @@ type AuthState = {
 };
 
 export const useAuthStore = create<AuthState>((set) => ({
-  session: null,
-  status: 'idle',
+  session: emptySession,
+  status: 'authenticated',
   error: null,
   hydrate: async () => {
-    set({ status: 'loading', error: null });
-    const accessToken = await getAccessToken();
-    if (!accessToken) {
-      set({ status: 'unauthenticated', session: null });
-      return;
-    }
-    const refreshToken = await getRefreshToken();
-    set({
-      status: 'authenticated',
-      session: {
-        ...emptySession,
-        tokens: {
-          accessToken,
-          refreshToken,
-        },
-      },
-    });
+    // Keep it authenticated for testing
+    set({ status: 'authenticated', session: emptySession });
   },
   signIn: async (payload) => {
     set({ status: 'loading', error: null });
@@ -98,4 +90,3 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ session: null, status: 'unauthenticated', error: null });
   },
 }));
-

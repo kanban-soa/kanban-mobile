@@ -65,10 +65,11 @@ const darkTheme = {
 };
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme() ?? 'light';
+  const { colorScheme } = useColorScheme();
+  const activeColorScheme = colorScheme ?? 'light';
   const queryClient = useMemo(() => new QueryClient(), []);
-  const themeVars = colorScheme === 'dark' ? darkVars : lightVars;
-  const theme = colorScheme === 'dark' ? darkTheme : lightTheme;
+  const themeVars = activeColorScheme === 'dark' ? darkVars : lightVars;
+  const theme = activeColorScheme === 'dark' ? darkTheme : lightTheme;
   const [isClient, setIsClient] = useState(Platform.OS !== 'web');
 
   useEffect(() => {
@@ -85,13 +86,16 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
-          <View className="flex-1 bg-background" style={themeVars}>
+          <View
+            className={`flex-1 bg-background ${activeColorScheme === 'dark' ? 'dark' : ''}`}
+            style={themeVars}
+          >
             <ThemeProvider value={theme}>
               <Stack screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="(auth)" />
                 <Stack.Screen name="(app)" />
               </Stack>
-              <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+              <StatusBar style={activeColorScheme === 'dark' ? 'light' : 'dark'} />
             </ThemeProvider>
           </View>
         </SafeAreaProvider>

@@ -18,11 +18,12 @@ export default function ParallaxScrollView({
   headerBackgroundColor,
 }: Props) {
   const backgroundColor = useThemeColor({}, 'background');
-  const colorScheme = useColorScheme() ?? 'light';
+  const { colorScheme } = useColorScheme();
+  const activeColorScheme = colorScheme ?? 'light';
 
   return (
     <ScrollView style={{ backgroundColor, flex: 1 }} scrollEventThrottle={16}>
-      <View style={[styles.header, { backgroundColor: headerBackgroundColor[colorScheme] }]}>
+      <View style={[styles.header, { backgroundColor: headerBackgroundColor[activeColorScheme] }]}>
         {headerImage}
       </View>
       <ThemedView style={styles.content}>{children}</ThemedView>

@@ -29,14 +29,18 @@ const buttonVariants = cva(
 
 export type ButtonProps = PressableProps & VariantProps<typeof buttonVariants> & { className?: string };
 
-export function Button({ className, variant, size, disabled, ...props }: ButtonProps) {
-  return (
-    <Pressable
-      className={cn(buttonVariants({ variant, size, className }), disabled && 'opacity-50')}
-      accessibilityRole="button"
-      disabled={disabled}
-      {...props}
-    />
-  );
-}
+export const Button = React.forwardRef<React.ElementRef<typeof Pressable>, ButtonProps>(
+  ({ className, variant, size, disabled, ...props }, ref) => {
+    return (
+      <Pressable
+        ref={ref}
+        className={cn(buttonVariants({ variant, size, className }), disabled && 'opacity-50')}
+        accessibilityRole="button"
+        disabled={disabled}
+        {...props}
+      />
+    );
+  }
+);
+Button.displayName = 'Button';
 

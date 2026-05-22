@@ -28,42 +28,46 @@ const webStorage = {
   },
 };
 
-const storage = Platform.OS === 'web' || !canUseSecureStore ? webStorage : SecureStore;
-
 export async function getAccessToken() {
-  return storage.getItemAsync ? storage.getItemAsync(ACCESS_TOKEN_KEY) : storage.getItem(ACCESS_TOKEN_KEY);
+  if (Platform.OS !== 'web' && canUseSecureStore) {
+    return SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+  }
+  return webStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
 export async function getRefreshToken() {
-  return storage.getItemAsync ? storage.getItemAsync(REFRESH_TOKEN_KEY) : storage.getItem(REFRESH_TOKEN_KEY);
+  if (Platform.OS !== 'web' && canUseSecureStore) {
+    return SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+  }
+  return webStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
 export async function setTokens(accessToken: string, refreshToken: string | null) {
-  if (storage.setItemAsync) {
-    await storage.setItemAsync(ACCESS_TOKEN_KEY, accessToken);
+  if (Platform.OS !== 'web' && canUseSecureStore) {
+    await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken);
     if (refreshToken) {
-      await storage.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
+      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
     } else {
-      await storage.deleteItemAsync(REFRESH_TOKEN_KEY);
+      await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
     }
     return;
   }
 
-  await storage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  await webStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
   if (refreshToken) {
-    await storage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    await webStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
   } else {
-    await storage.removeItem(REFRESH_TOKEN_KEY);
+    await webStorage.removeItem(REFRESH_TOKEN_KEY);
   }
 }
 
 export async function clearTokens() {
-  if (storage.deleteItemAsync) {
-    await storage.deleteItemAsync(ACCESS_TOKEN_KEY);
-    await storage.deleteItemAsync(REFRESH_TOKEN_KEY);
+  if (Platform.OS !== 'web' && canUseSecureStore) {
+    await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
+    await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
     return;
   }
 
-  await storage.removeItem(ACCESS_TOKEN_KEY);
-  await storage.removeItem(REFRESH_TOKEN_KEY);
+  await webStorage.removeItem(ACCESS_TOKEN_KEY);
+  await webStorage.removeItem(REFRESH_TOKEN_KEY);
 }

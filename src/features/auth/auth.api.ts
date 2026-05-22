@@ -8,4 +8,3 @@ export async function signIn(payload: LoginPayload) {
 export async function signUp(payload: SignupPayload) {
   return api.post('auth/signup', { json: payload }).json<AuthResponse>();
 }
-

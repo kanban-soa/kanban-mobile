@@ -1,7 +1,10 @@
 import type { Config } from 'tailwindcss';
+// @ts-ignore
+import nativewind from 'nativewind/preset';
 
 export default {
   content: ['./app/**/*.{ts,tsx}', './src/**/*.{ts,tsx}'],
+  presets: [nativewind],
   darkMode: 'class',
   theme: {
     extend: {
