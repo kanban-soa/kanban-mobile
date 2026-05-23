@@ -45,6 +45,10 @@ export type Invitation = {
   workspace: string;
 };
 
+export type UpdateWorkspaceRequest = {
+  name: string;
+};
+
 export type InviteMemberRequest = {
   email: string;
 };

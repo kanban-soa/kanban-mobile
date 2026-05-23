@@ -7,6 +7,7 @@ import { Badge } from '~/components/ui/badge';
 import { Button } from '~/components/ui/button';
 import { Feather } from '@expo/vector-icons';
 import { Input } from '~/components/ui/input';
+import { WorkspaceBanner } from '~/components/workspace-banner';
 import { useAuthStore } from '~/store/auth.store';
 
 type Role = 'Owner' | 'Admin' | 'Member';
@@ -40,7 +41,6 @@ const buildInitialMembers = (currentUser: { id: string; name: string; email: str
 export default function MembersScreen() {
   const router = useRouter();
   const { workspaceId } = useLocalSearchParams();
-  const displayWorkspaceId = workspaceId === 'default' ? 'Personal Workspace' : `Workspace ${workspaceId}`;
 
   const currentUser = useAuthStore((state) => state.session?.user) ?? null;
   const initial = useMemo(
@@ -99,11 +99,9 @@ export default function MembersScreen() {
 
   return (
     <View className="flex-1 bg-background p-4">
+      <WorkspaceBanner />
       <View className="flex-row items-center justify-between mb-6">
-        <View>
-          <Text className="text-2xl font-bold text-foreground">Workspace Members</Text>
-          <Text className="text-sm text-muted-foreground">{displayWorkspaceId}</Text>
-        </View>
+        <Text className="text-2xl font-bold text-foreground">Workspace Members</Text>
         <Button
           size="sm"
           onPress={() => setIsInviting(true)}

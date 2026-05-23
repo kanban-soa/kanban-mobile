@@ -15,6 +15,8 @@ export const WORKSPACES = {
   LIST: 'api/v1/workspaces',
   CREATE: 'api/v1/workspaces',
   DETAIL: (id: string) => `api/v1/workspaces/${id}`,
+  UPDATE: (id: string) => `api/v1/workspaces/${id}`,
+  DELETE: (id: string) => `api/v1/workspaces/${id}`,
   MEMBERS: (workspaceId: string) => `api/v1/workspaces/${workspaceId}/members`,
   INVITE: (workspaceId: string) => `api/v1/workspaces/${workspaceId}/members`,
   CHANGE_ROLE: (workspaceId: string, memberId: string) =>

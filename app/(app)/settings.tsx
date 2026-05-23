@@ -6,6 +6,7 @@ import { Button } from '~/components/ui/button';
 import { useColorScheme } from '~/hooks/useColorScheme';
 import { Card } from '~/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
+import { WorkspaceBanner } from '~/components/workspace-banner';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -23,6 +24,7 @@ export default function SettingsScreen() {
 
   return (
     <View className="flex-1 bg-background p-4">
+      <WorkspaceBanner />
       <Text className="text-3xl font-bold text-foreground mb-6">Settings</Text>
       
       <Card className="mb-4">
