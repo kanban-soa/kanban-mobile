@@ -5,6 +5,7 @@ import type {
   Invitation,
   InviteMemberRequest,
   MemberRequest,
+  UpdateWorkspaceRequest,
   Workspace,
 } from '~/lib/api/types';
 
@@ -26,6 +27,17 @@ export async function getWorkspace(id: string): Promise<Workspace> {
 
 export async function createWorkspace(name: string): Promise<Workspace> {
   return api.post(WORKSPACES.CREATE, { json: { name } }).json<Workspace>();
+}
+
+export async function updateWorkspace(
+  id: string,
+  payload: UpdateWorkspaceRequest,
+): Promise<Workspace> {
+  return api.patch(WORKSPACES.UPDATE(id), { json: payload }).json<Workspace>();
+}
+
+export async function deleteWorkspace(id: string): Promise<void> {
+  await api.delete(WORKSPACES.DELETE(id));
 }
 
 export async function getMembers(workspaceId: string): Promise<MemberRequest[]> {

@@ -2,6 +2,7 @@ import { Link, useLocalSearchParams } from 'expo-router';
 import React from 'react';
 import { View, Text, FlatList, Pressable } from 'react-native';
 import { Card } from '~/components/ui/card';
+import { WorkspaceBanner } from '~/components/workspace-banner';
 
 // Mock data for boards
 const MOCK_BOARDS = [
@@ -12,13 +13,12 @@ const MOCK_BOARDS = [
 
 export default function BoardsScreen() {
   const { workspaceId } = useLocalSearchParams<{ workspaceId: string }>();
-  const displayWorkspaceId = workspaceId === 'default' ? 'Default Workspace' : `Workspace ${workspaceId}`;
 
   return (
     <View className="flex-1 bg-background p-4">
-      <Text className="text-2xl font-bold text-foreground mb-2">Boards</Text>
-      <Text className="text-md text-muted-foreground mb-6">{displayWorkspaceId}</Text>
-      
+      <WorkspaceBanner />
+      <Text className="text-2xl font-bold text-foreground mb-6">Boards</Text>
+
       <FlatList
         data={MOCK_BOARDS}
         keyExtractor={(item) => item.id}
