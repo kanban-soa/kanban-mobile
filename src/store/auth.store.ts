@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
-import { signIn, signUp } from '~/features/auth/auth.api';
-import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '~/features/auth/tokens';
+import { login as loginRequest, register as registerRequest } from '~/features/auth/auth.api';
+import { clearTokens } from '~/features/auth/tokens';
 import type { AuthSession, AuthStatus, AuthUser, LoginPayload, SignupPayload } from '~/types';
 
 const mockUser: AuthUser = {
@@ -40,18 +40,15 @@ export const useAuthStore = create<AuthState>((set) => ({
   signIn: async (payload) => {
     set({ status: 'loading', error: null });
     try {
-      const response = await signIn(payload);
-      const accessToken = response.accessToken ?? '';
-      const refreshToken = response.refreshToken ?? null;
-      if (!accessToken) {
+      const response = await loginRequest(payload);
+      if (!response.token) {
         throw new Error('Missing access token in response.');
       }
-      await setTokens(accessToken, refreshToken);
       set({
         status: 'authenticated',
         session: {
-          user: response.user ?? null,
-          tokens: { accessToken, refreshToken },
+          user: response.user as AuthUser,
+          tokens: { accessToken: response.token, refreshToken: response.refreshToken ?? null },
         },
       });
     } catch (error) {
@@ -64,18 +61,15 @@ export const useAuthStore = create<AuthState>((set) => ({
   signUp: async (payload) => {
     set({ status: 'loading', error: null });
     try {
-      const response = await signUp(payload);
-      const accessToken = response.accessToken ?? '';
-      const refreshToken = response.refreshToken ?? null;
-      if (!accessToken) {
+      const response = await registerRequest(payload);
+      if (!response.token) {
         throw new Error('Missing access token in response.');
       }
-      await setTokens(accessToken, refreshToken);
       set({
         status: 'authenticated',
         session: {
-          user: response.user ?? null,
-          tokens: { accessToken, refreshToken },
+          user: response.user as AuthUser,
+          tokens: { accessToken: response.token, refreshToken: response.refreshToken ?? null },
         },
       });
     } catch (error) {

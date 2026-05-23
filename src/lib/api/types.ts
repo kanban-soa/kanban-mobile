@@ -1,0 +1,71 @@
+/**
+ * Shared API types — mirrors kanban-web/src/lib/api/types.ts.
+ */
+
+export type WorkspaceRole = 'admin' | 'member' | 'owner' | 'observer';
+
+export type MemberStatus = 'active' | 'invited' | 'removed' | 'cancelled';
+
+export type Workspace = {
+  id: string;
+  name: string;
+  boardIds: string[];
+  members: string[];
+};
+
+export type Account = {
+  id: string;
+  email: string;
+  name: string;
+};
+
+export type MemberRequest = {
+  id: number;
+  publicId: string;
+  email: string;
+  name: string | null;
+  userId: string;
+  workspaceId: number;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string | null;
+  deletedAt: string | null;
+  deletedBy: string | null;
+  role: string;
+  roleId: string | null;
+  status: string;
+};
+
+export type Invitation = {
+  id: string;
+  publicId: string;
+  email: string;
+  role: WorkspaceRole;
+  sentAt: string;
+  workspace: string;
+};
+
+export type InviteMemberRequest = {
+  email: string;
+};
+
+export type ChangeRoleRequest = {
+  role: WorkspaceRole;
+};
+
+export type LoginRequest = {
+  email: string;
+  password: string;
+};
+
+export type RegisterRequest = {
+  email: string;
+  password: string;
+  name: string;
+};
+
+export type AuthResponse = {
+  token: string;
+  refreshToken: string;
+  user: Account;
+};

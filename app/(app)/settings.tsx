@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, Switch } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useAuthStore } from '~/store/auth.store';
 import { Button } from '~/components/ui/button';
 import { useColorScheme } from '~/hooks/useColorScheme';
@@ -7,9 +8,15 @@ import { Card } from '~/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const signOut = useAuthStore((state) => state.signOut);
   const session = useAuthStore((state) => state.session);
   const user = session?.user;
+
+  const handleLogout = async () => {
+    await signOut();
+    router.replace('/(auth)/login');
+  };
 
   const { colorScheme, toggleColorScheme } = useColorScheme();
   const isDark = (colorScheme ?? 'light') === 'dark';
@@ -42,7 +49,7 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        <Button variant="destructive" onPress={() => signOut()}>
+        <Button variant="destructive" onPress={handleLogout}>
           <Text className="text-white font-semibold">Log out</Text>
         </Button>
       </Card>
