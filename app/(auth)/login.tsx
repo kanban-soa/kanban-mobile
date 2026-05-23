@@ -1,4 +1,4 @@
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,6 +12,7 @@ import { useAuthStore } from '~/store/auth.store';
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginScreen() {
+  const router = useRouter();
   const signIn = useAuthStore((state) => state.signIn);
   const status = useAuthStore((state) => state.status);
   const authError = useAuthStore((state) => state.error);
@@ -34,6 +35,9 @@ export default function LoginScreen() {
     }
 
     await signIn({ email: email.trim(), password });
+    if (useAuthStore.getState().status === 'authenticated') {
+      router.replace('/');
+    }
   };
 
   return (

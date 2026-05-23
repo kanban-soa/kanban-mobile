@@ -1,9 +1,14 @@
 import ky from 'ky';
 
-import { getAccessToken } from '~/features/auth/tokens';
+import { clearTokens, getAccessToken } from '~/features/auth/tokens';
+
+const DEFAULT_BASE_URL = 'http://localhost:8080';
+
+const baseUrl =
+  process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '') ?? DEFAULT_BASE_URL;
 
 export const api = ky.create({
-  prefixUrl: 'https://kan.bn/api/v1',
+  prefixUrl: baseUrl,
   hooks: {
     beforeRequest: [
       async (request) => {
@@ -13,6 +18,13 @@ export const api = ky.create({
         }
       },
     ],
+    afterResponse: [
+      async (_request, _options, response) => {
+        if (response.status === 401) {
+          await clearTokens();
+        }
+        return response;
+      },
+    ],
   },
 });
-
