@@ -1,14 +1,21 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { View, Text, FlatList, Pressable, Modal } from 'react-native';
-import { Card } from '~/components/ui/card';
+import { Feather } from '@expo/vector-icons';
+
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
 import { Badge } from '~/components/ui/badge';
 import { Button } from '~/components/ui/button';
-import { Feather } from '@expo/vector-icons';
+import { Card } from '~/components/ui/card';
 import { Input } from '~/components/ui/input';
+import { ConfirmDialog } from '~/components/confirm-dialog';
+import {
+  RoleSwitchModal,
+  type ManageableRole,
+} from '~/components/member/role-switch-modal';
 import { WorkspaceBanner } from '~/components/workspace-banner';
 import { useAuthStore } from '~/store/auth.store';
+import { useSurfaceColors } from '~/lib/surface-colors';
 
 type Role = 'Owner' | 'Admin' | 'Member';
 
@@ -20,7 +27,9 @@ type Member = {
   avatarUrl: string | null;
 };
 
-const buildInitialMembers = (currentUser: { id: string; name: string; email: string; avatarUrl: string | null } | null): Member[] => {
+const buildInitialMembers = (
+  currentUser: { id: string; name: string; email: string; avatarUrl: string | null } | null,
+): Member[] => {
   const base: Member[] = [
     { id: '1', name: 'John Doe', email: 'john@example.com', role: 'Owner', avatarUrl: 'https://i.pravatar.cc/150?u=1' },
     { id: '2', name: 'Jane Smith', email: 'jane@example.com', role: 'Admin', avatarUrl: 'https://i.pravatar.cc/150?u=2' },
@@ -31,7 +40,7 @@ const buildInitialMembers = (currentUser: { id: string; name: string; email: str
       id: currentUser.id,
       name: `${currentUser.name} (You)`,
       email: currentUser.email,
-      role: 'Member',
+      role: 'Admin',
       avatarUrl: currentUser.avatarUrl,
     });
   }
@@ -40,16 +49,21 @@ const buildInitialMembers = (currentUser: { id: string; name: string; email: str
 
 export default function MembersScreen() {
   const router = useRouter();
-  const { workspaceId } = useLocalSearchParams();
+  const colors = useSurfaceColors();
 
   const currentUser = useAuthStore((state) => state.session?.user) ?? null;
   const initial = useMemo(
-    () => buildInitialMembers(currentUser ? {
-      id: currentUser.id,
-      name: currentUser.name ?? 'You',
-      email: currentUser.email ?? '',
-      avatarUrl: currentUser.avatarUrl ?? null,
-    } : null),
+    () =>
+      buildInitialMembers(
+        currentUser
+          ? {
+              id: currentUser.id,
+              name: currentUser.name ?? 'You',
+              email: currentUser.email ?? '',
+              avatarUrl: currentUser.avatarUrl ?? null,
+            }
+          : null,
+      ),
     [currentUser],
   );
 
@@ -57,9 +71,14 @@ export default function MembersScreen() {
   const [isInviting, setIsInviting] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [activeMemberId, setActiveMemberId] = useState<string | null>(null);
+  const [roleSwitchMember, setRoleSwitchMember] = useState<Member | null>(null);
+  const [removingMember, setRemovingMember] = useState<Member | null>(null);
+  const [isLeaveOpen, setIsLeaveOpen] = useState(false);
 
   const activeMember = members.find((m) => m.id === activeMemberId) ?? null;
-  const currentMember = currentUser ? members.find((m) => m.id === currentUser.id) ?? null : null;
+  const currentMember = currentUser
+    ? members.find((m) => m.id === currentUser.id) ?? null
+    : null;
   const canManage = currentMember?.role === 'Owner' || currentMember?.role === 'Admin';
 
   const closeActions = () => setActiveMemberId(null);
@@ -81,19 +100,24 @@ export default function MembersScreen() {
     setIsInviting(false);
   };
 
-  const updateRole = (id: string, role: Role) => {
-    setMembers((prev) => prev.map((m) => (m.id === id ? { ...m, role } : m)));
-    closeActions();
+  const handleRoleChange = (role: ManageableRole) => {
+    if (!roleSwitchMember) return;
+    setMembers((prev) =>
+      prev.map((m) => (m.id === roleSwitchMember.id ? { ...m, role } : m)),
+    );
+    setRoleSwitchMember(null);
   };
 
-  const removeMember = (id: string) => {
-    setMembers((prev) => prev.filter((m) => m.id !== id));
-    closeActions();
+  const handleRemoveMember = () => {
+    if (!removingMember) return;
+    setMembers((prev) => prev.filter((m) => m.id !== removingMember.id));
+    setRemovingMember(null);
   };
 
-  const leaveWorkspace = (id: string) => {
-    setMembers((prev) => prev.filter((m) => m.id !== id));
-    closeActions();
+  const handleLeave = () => {
+    if (!currentMember) return;
+    setMembers((prev) => prev.filter((m) => m.id !== currentMember.id));
+    setIsLeaveOpen(false);
     router.back();
   };
 
@@ -152,7 +176,13 @@ export default function MembersScreen() {
                   <View className="flex-row items-center">
                     <Text className="text-base font-semibold text-foreground mr-2">{item.name}</Text>
                     <Badge variant={item.role === 'Owner' ? 'default' : 'outline'}>
-                      <Text className={item.role === 'Owner' ? 'text-[10px] text-white' : 'text-[10px]'}>{item.role}</Text>
+                      <Text
+                        className={
+                          item.role === 'Owner' ? 'text-[10px] text-white' : 'text-[10px]'
+                        }
+                      >
+                        {item.role}
+                      </Text>
                     </Badge>
                   </View>
                   <Text className="text-sm text-muted-foreground">{item.email}</Text>
@@ -180,13 +210,16 @@ export default function MembersScreen() {
       >
         <Pressable
           className="flex-1 justify-end"
-          style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
           onPress={closeActions}
         >
           <Pressable onPress={(e) => e.stopPropagation()}>
             <View
-              className="bg-background rounded-t-2xl p-4 pb-8 border-t border-border"
+              className="rounded-t-2xl p-4 pb-8"
               style={{
+                backgroundColor: colors.background,
+                borderTopWidth: 1,
+                borderColor: colors.border,
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: -2 },
                 shadowOpacity: 0.15,
@@ -196,42 +229,58 @@ export default function MembersScreen() {
             >
               {activeMember && (
                 <>
-                  <View className="self-center w-10 h-1 rounded-full bg-border mb-4" />
+                  <View
+                    className="self-center w-10 h-1 rounded-full mb-4"
+                    style={{ backgroundColor: colors.border }}
+                  />
                   <View className="flex-row items-center mb-4">
                     <Avatar className="h-12 w-12 mr-3">
-                      {activeMember.avatarUrl && <AvatarImage source={{ uri: activeMember.avatarUrl }} />}
+                      {activeMember.avatarUrl && (
+                        <AvatarImage source={{ uri: activeMember.avatarUrl }} />
+                      )}
                       <AvatarFallback initials={activeMember.name.charAt(0).toUpperCase()} />
                     </Avatar>
                     <View className="flex-1">
-                      <Text className="text-base font-semibold text-foreground">{activeMember.name}</Text>
+                      <Text className="text-base font-semibold text-foreground">
+                        {activeMember.name}
+                      </Text>
                       <Text className="text-sm text-muted-foreground">{activeMember.email}</Text>
                     </View>
                   </View>
 
-                  {canManage && activeMember.role !== 'Owner' && currentUser?.id !== activeMember.id && (
-                    <>
-                      <ActionRow
-                        icon="shield"
-                        label={activeMember.role === 'Admin' ? 'Change to Member' : 'Make Admin'}
-                        onPress={() =>
-                          updateRole(activeMember.id, activeMember.role === 'Admin' ? 'Member' : 'Admin')
-                        }
-                      />
-                      <ActionRow
-                        icon="user-x"
-                        label="Remove from workspace"
-                        destructive
-                        onPress={() => removeMember(activeMember.id)}
-                      />
-                    </>
-                  )}
+                  {canManage &&
+                    activeMember.role !== 'Owner' &&
+                    currentUser?.id !== activeMember.id && (
+                      <>
+                        <ActionRow
+                          icon="shield"
+                          label="Change role"
+                          onPress={() => {
+                            setRoleSwitchMember(activeMember);
+                            closeActions();
+                          }}
+                        />
+                        <ActionRow
+                          icon="user-x"
+                          label="Remove from workspace"
+                          destructive
+                          onPress={() => {
+                            setRemovingMember(activeMember);
+                            closeActions();
+                          }}
+                        />
+                      </>
+                    )}
 
-                  {currentUser?.id === activeMember.id && (
+                  {currentUser?.id === activeMember.id && activeMember.role !== 'Owner' && (
                     <ActionRow
                       icon="log-out"
                       label="Leave workspace"
                       destructive
-                      onPress={() => leaveWorkspace(activeMember.id)}
+                      onPress={() => {
+                        setIsLeaveOpen(true);
+                        closeActions();
+                      }}
                     />
                   )}
 
@@ -244,6 +293,47 @@ export default function MembersScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <RoleSwitchModal
+        visible={roleSwitchMember !== null}
+        member={
+          roleSwitchMember && roleSwitchMember.role !== 'Owner'
+            ? {
+                id: roleSwitchMember.id,
+                name: roleSwitchMember.name,
+                email: roleSwitchMember.email,
+                avatarUrl: roleSwitchMember.avatarUrl,
+                role: roleSwitchMember.role,
+              }
+            : null
+        }
+        onClose={() => setRoleSwitchMember(null)}
+        onConfirm={handleRoleChange}
+      />
+
+      <ConfirmDialog
+        visible={removingMember !== null}
+        title="Remove member"
+        message={
+          removingMember
+            ? `Remove ${removingMember.name} from this workspace? They will lose access immediately.`
+            : ''
+        }
+        confirmLabel="Remove"
+        destructive
+        onClose={() => setRemovingMember(null)}
+        onConfirm={handleRemoveMember}
+      />
+
+      <ConfirmDialog
+        visible={isLeaveOpen}
+        title="Leave workspace"
+        message="Are you sure you want to leave this workspace? You will lose access to all its boards."
+        confirmLabel="Leave"
+        destructive
+        onClose={() => setIsLeaveOpen(false)}
+        onConfirm={handleLeave}
+      />
     </View>
   );
 }

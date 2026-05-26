@@ -7,36 +7,38 @@ import { Button } from '~/components/ui/button';
 import { Card } from '~/components/ui/card';
 import { Input } from '~/components/ui/input';
 import { Separator } from '~/components/ui/separator';
-import { useAuthStore } from '~/store/auth.store';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export default function LoginScreen() {
+export default function ForgotPasswordScreen() {
   const router = useRouter();
-  const signIn = useAuthStore((state) => state.signIn);
-  const status = useAuthStore((state) => state.status);
-  const authError = useAuthStore((state) => state.error);
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const isLoading = status === 'loading';
-  const isValid = useMemo(() => EMAIL_REGEX.test(email.trim()) && password.length >= 8, [email, password]);
+  const isValid = useMemo(() => EMAIL_REGEX.test(email.trim()), [email]);
 
   const handleSubmit = async () => {
     setFormError(null);
+    setSuccessMessage(null);
     if (!EMAIL_REGEX.test(email.trim())) {
       setFormError('Enter a valid email address.');
       return;
     }
-    if (password.length < 8) {
-      setFormError('Password must be at least 8 characters.');
-      return;
-    }
 
-    await signIn({ email: email.trim(), password });
-    if (useAuthStore.getState().status === 'authenticated') {
-      router.replace('/');
+    setIsLoading(true);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      setSuccessMessage('Verification code has been sent to your email.');
+      router.push({
+        pathname: '/(auth)/reset-password',
+        params: { email: email.trim() },
+      });
+    } catch {
+      setFormError('An error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -46,8 +48,10 @@ export default function LoginScreen() {
         behavior={Platform.select({ ios: 'padding', android: undefined })}
         className="flex-1 justify-center px-6">
         <View className="mb-8">
-          <Text className="text-2xl font-semibold text-foreground">Welcome back</Text>
-          <Text className="mt-2 text-sm text-muted-foreground">Sign in to continue to kan.bn</Text>
+          <Text className="text-2xl font-semibold text-foreground">Forgot password?</Text>
+          <Text className="mt-2 text-sm text-muted-foreground">
+            Enter your email and we&apos;ll send you a verification code to reset your password.
+          </Text>
         </View>
 
         <Card className="gap-4">
@@ -60,47 +64,29 @@ export default function LoginScreen() {
               keyboardType="email-address"
               value={email}
               onChangeText={setEmail}
-              returnKeyType="next"
-            />
-          </View>
-          <View className="gap-2">
-            <Text className="text-sm font-medium text-foreground">Password</Text>
-            <Input
-              placeholder="••••••••"
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
               returnKeyType="done"
             />
           </View>
 
-          {(formError || authError) && (
-            <Text className="text-sm text-destructive">{formError ?? authError}</Text>
-          )}
+          {formError && <Text className="text-sm text-destructive">{formError}</Text>}
+          {successMessage && <Text className="text-sm text-foreground">{successMessage}</Text>}
 
           <Button onPress={handleSubmit} disabled={!isValid || isLoading}>
             <Text className="text-sm font-medium text-primary-foreground">
-              {isLoading ? 'Signing in...' : 'Sign in'}
+              {isLoading ? 'Sending...' : 'Send reset code'}
             </Text>
           </Button>
-
-          <Link
-            href="/(auth)/forgot-password"
-            className="self-center text-xs font-medium text-muted-foreground">
-            Forgot your password?
-          </Link>
         </Card>
 
         <Separator className="my-6" />
 
         <View className="flex-row items-center justify-center gap-2">
-          <Text className="text-sm text-muted-foreground">New to kan.bn?</Text>
-          <Link href="/(auth)/signup" className="text-sm font-semibold text-foreground">
-            Create account
+          <Text className="text-sm text-muted-foreground">Remember your password?</Text>
+          <Link href="/(auth)/login" className="text-sm font-semibold text-foreground">
+            Back to login
           </Link>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
-

@@ -1,10 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Card } from '~/components/ui/card';
-import { Input } from '~/components/ui/input';
-import { Button } from '~/components/ui/button';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -13,44 +10,53 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-// Mock data for board columns and tasks
-const INITIAL_COLUMNS = [
-  {
-    id: 'todo',
-    title: 'To Do',
-    tasks: [
-      { id: '1', title: 'Design landing page', priority: 'High' },
-      { id: '2', title: 'Set up database', priority: 'Medium' },
-    ],
-  },
-  {
-    id: 'in-progress',
-    title: 'In Progress',
-    tasks: [
-      { id: '3', title: 'Implement authentication', priority: 'High' },
-    ],
-  },
-  {
-    id: 'done',
-    title: 'Done',
-    tasks: [
-      { id: '4', title: 'Project scaffolding', priority: 'Low' },
-    ],
-  },
-];
+import { Card } from '~/components/ui/card';
+import { Input } from '~/components/ui/input';
+import { Button } from '~/components/ui/button';
+import { LabelManagerModal } from '~/components/board/label-manager-modal';
+import {
+  DueDatePickerSheet,
+  LabelPickerSheet,
+  MemberPickerSheet,
+} from '~/components/board/card-quick-actions';
+import { ConfirmDialog } from '~/components/confirm-dialog';
+import {
+  type BoardLabel,
+  type Task,
+  type WorkspaceMember,
+  useBoardStore,
+} from '~/store/board.store';
 
-type Task = { id: string; title: string; priority: string };
+function formatDueDate(value: string): string {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
 
 function DraggableCard({
   task,
   sourceColumnId,
+  labels,
+  members,
   onDrop,
-  onDelete,
+  onOpenLabels,
+  onOpenMembers,
+  onOpenDueDate,
+  onOpenCard,
 }: {
   task: Task;
   sourceColumnId: string;
+  labels: BoardLabel[];
+  members: WorkspaceMember[];
   onDrop: (taskId: string, sourceColId: string, x: number, y: number) => void;
-  onDelete: (taskId: string, sourceColId: string) => void;
+  onOpenLabels: (taskId: string, sourceColId: string) => void;
+  onOpenMembers: (taskId: string, sourceColId: string) => void;
+  onOpenDueDate: (taskId: string, sourceColId: string) => void;
+  onOpenCard: (taskId: string) => void;
 }) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -62,6 +68,7 @@ function DraggableCard({
   };
 
   const pan = Gesture.Pan()
+    .activateAfterLongPress(200)
     .onStart(() => {
       isDragging.value = true;
       zIndex.value = 100;
@@ -93,18 +100,94 @@ function DraggableCard({
     };
   });
 
+  const attachedLabels = labels.filter((l) => task.labelIds.includes(l.id));
+  const assignedMembers = members.filter((m) => task.memberIds.includes(m.id));
+
   return (
     <GestureDetector gesture={pan}>
       <Animated.View style={style}>
         <Card className="mb-3 p-3 bg-card border-border">
-          <View className="flex-row items-start justify-between">
-            <Text className="text-base font-medium text-foreground mb-2 flex-1 pr-2">{task.title}</Text>
-            <Pressable onPress={() => onDelete(task.id, sourceColumnId)} className="p-1">
-              <Feather name="x" size={16} className="text-muted-foreground" />
+          <Pressable onPress={() => onOpenCard(task.id)}>
+            {attachedLabels.length > 0 && (
+              <View className="flex-row flex-wrap gap-1 mb-2">
+                {attachedLabels.slice(0, 3).map((label) => (
+                  <View
+                    key={label.id}
+                    style={{ backgroundColor: label.color }}
+                    className="rounded-full px-2 py-0.5"
+                  >
+                    <Text className="text-[10px] text-white font-medium">{label.name}</Text>
+                  </View>
+                ))}
+                {attachedLabels.length > 3 && (
+                  <Text className="text-[10px] text-muted-foreground self-center">
+                    +{attachedLabels.length - 3}
+                  </Text>
+                )}
+              </View>
+            )}
+
+            <Text className="text-base font-medium text-foreground mb-2">{task.title}</Text>
+
+            <View className="flex-row items-center justify-between">
+              {assignedMembers.length > 0 ? (
+                <View className="flex-row items-center">
+                  {assignedMembers.slice(0, 3).map((m, i) => (
+                    <View
+                      key={m.id}
+                      className="h-6 w-6 rounded-full bg-muted items-center justify-center border-2 border-card"
+                      style={{ marginLeft: i === 0 ? 0 : -8 }}
+                    >
+                      <Text className="text-[10px] font-medium text-foreground uppercase">
+                        {m.name.charAt(0)}
+                      </Text>
+                    </View>
+                  ))}
+                  {assignedMembers.length > 3 && (
+                    <Text className="text-[10px] text-muted-foreground ml-1">
+                      +{assignedMembers.length - 3}
+                    </Text>
+                  )}
+                </View>
+              ) : (
+                <View />
+              )}
+              {task.dueDate && (
+                <View className="flex-row items-center">
+                  <Feather name="calendar" size={12} className="text-muted-foreground" />
+                  <Text className="text-[11px] text-muted-foreground ml-1">
+                    {formatDueDate(task.dueDate)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </Pressable>
+
+          <View className="flex-row items-center mt-2 pt-2 border-t border-border gap-2">
+            <Pressable
+              onPress={() => onOpenLabels(task.id, sourceColumnId)}
+              className="flex-row items-center px-2 py-1 rounded-md active:bg-muted"
+              accessibilityLabel="Edit labels"
+            >
+              <Feather name="tag" size={12} className="text-muted-foreground" />
+              <Text className="text-[11px] text-muted-foreground ml-1">Labels</Text>
             </Pressable>
-          </View>
-          <View className="self-start bg-primary/10 px-2 py-1 rounded-md mt-1">
-            <Text className="text-xs text-primary">{task.priority}</Text>
+            <Pressable
+              onPress={() => onOpenMembers(task.id, sourceColumnId)}
+              className="flex-row items-center px-2 py-1 rounded-md active:bg-muted"
+              accessibilityLabel="Edit assignees"
+            >
+              <Feather name="user-plus" size={12} className="text-muted-foreground" />
+              <Text className="text-[11px] text-muted-foreground ml-1">Assign</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => onOpenDueDate(task.id, sourceColumnId)}
+              className="flex-row items-center px-2 py-1 rounded-md active:bg-muted"
+              accessibilityLabel="Edit due date"
+            >
+              <Feather name="calendar" size={12} className="text-muted-foreground" />
+              <Text className="text-[11px] text-muted-foreground ml-1">Date</Text>
+            </Pressable>
           </View>
         </Card>
       </Animated.View>
@@ -113,62 +196,72 @@ function DraggableCard({
 }
 
 export default function BoardScreen() {
-  const { workspaceId, boardId } = useLocalSearchParams();
+  const { workspaceId, boardId } = useLocalSearchParams<{ workspaceId: string; boardId: string }>();
   const router = useRouter();
   const defaultBoardName = boardId === 'default-board' ? 'Default Board' : `Board ${boardId}`;
 
-  const [boardName, setBoardName] = useState(defaultBoardName);
-  const [isEditingBoardName, setIsEditingBoardName] = useState(false);
+  const ensureBoard = useBoardStore((s) => s.ensureBoard);
+  const board = useBoardStore((s) => s.boards[boardId]);
+  const members = useBoardStore((s) => s.members);
 
-  const [columns, setColumns] = useState(INITIAL_COLUMNS);
+  useEffect(() => {
+    ensureBoard(boardId, defaultBoardName);
+  }, [boardId, defaultBoardName, ensureBoard]);
+
+  const updateBoardMeta = useBoardStore((s) => s.updateBoardMeta);
+  const addColumn = useBoardStore((s) => s.addColumn);
+  const deleteColumn = useBoardStore((s) => s.deleteColumn);
+  const addCard = useBoardStore((s) => s.addCard);
+  const deleteCard = useBoardStore((s) => s.deleteCard);
+  const moveCard = useBoardStore((s) => s.moveCard);
+  const addLabel = useBoardStore((s) => s.addLabel);
+  const updateLabel = useBoardStore((s) => s.updateLabel);
+  const deleteLabel = useBoardStore((s) => s.deleteLabel);
+  const toggleCardLabel = useBoardStore((s) => s.toggleCardLabel);
+  const toggleCardMember = useBoardStore((s) => s.toggleCardMember);
+  const setCardDueDate = useBoardStore((s) => s.setCardDueDate);
+
+  const columns = board?.columns ?? [];
+  const labels = board?.labels ?? [];
+
+  const [isEditingBoardName, setIsEditingBoardName] = useState(false);
+  const [editingTitle, setEditingTitle] = useState('');
+
+  useEffect(() => {
+    if (board) setEditingTitle(board.title);
+  }, [board?.title]);
+
   const [scrollX, setScrollX] = useState(0);
 
-  // States for adding inline
   const [addingCardTo, setAddingCardTo] = useState<string | null>(null);
   const [newCardTitle, setNewCardTitle] = useState('');
-  
+
   const [isAddingList, setIsAddingList] = useState(false);
   const [newListTitle, setNewListTitle] = useState('');
 
-  const handleDrop = (taskId: string, sourceColumnId: string, absoluteX: number, absoluteY: number) => {
+  const [isLabelManagerOpen, setIsLabelManagerOpen] = useState(false);
+  const [deletingColumnId, setDeletingColumnId] = useState<string | null>(null);
+  const [activeCardRef, setActiveCardRef] = useState<
+    | { taskId: string; columnId: string; type: 'labels' | 'members' | 'dueDate' }
+    | null
+  >(null);
+
+  const activeTask = useMemo(() => {
+    if (!activeCardRef) return null;
+    const col = columns.find((c) => c.id === activeCardRef.columnId);
+    return col?.tasks.find((t) => t.id === activeCardRef.taskId) ?? null;
+  }, [activeCardRef, columns]);
+
+  const handleDrop = (taskId: string, sourceColumnId: string, absoluteX: number) => {
     const targetX = absoluteX - 16 + scrollX;
     const colIndex = Math.floor(targetX / 304);
 
     if (colIndex >= 0 && colIndex < columns.length) {
       const targetColumnId = columns[colIndex].id;
-
       if (targetColumnId !== sourceColumnId) {
-        setColumns((prev) => {
-          const newColumns = prev.map((col) => ({ ...col, tasks: [...col.tasks] }));
-          const sourceColIndex = newColumns.findIndex((c) => c.id === sourceColumnId);
-          const targetColIndex = newColumns.findIndex((c) => c.id === targetColumnId);
-
-          const taskIndex = newColumns[sourceColIndex].tasks.findIndex((t) => t.id === taskId);
-          const [taskToMove] = newColumns[sourceColIndex].tasks.splice(taskIndex, 1);
-
-          newColumns[targetColIndex].tasks.push(taskToMove);
-          return newColumns;
-        });
+        moveCard(boardId, taskId, targetColumnId);
       }
     }
-  };
-
-  const handleDeleteCard = (taskId: string, columnId: string) => {
-    setColumns((prev) =>
-      prev.map((col) => {
-        if (col.id === columnId) {
-          return {
-            ...col,
-            tasks: col.tasks.filter((t) => t.id !== taskId),
-          };
-        }
-        return col;
-      })
-    );
-  };
-
-  const handleDeleteList = (columnId: string) => {
-    setColumns((prev) => prev.filter((col) => col.id !== columnId));
   };
 
   const handleAddCardSubmit = (colId: string) => {
@@ -176,20 +269,7 @@ export default function BoardScreen() {
       setAddingCardTo(null);
       return;
     }
-    setColumns((prev) =>
-      prev.map((c) => {
-        if (c.id === colId) {
-          return {
-            ...c,
-            tasks: [
-              ...c.tasks,
-              { id: Date.now().toString(), title: newCardTitle.trim(), priority: 'Low' },
-            ],
-          };
-        }
-        return c;
-      })
-    );
+    addCard(boardId, colId, newCardTitle.trim());
     setNewCardTitle('');
     setAddingCardTo(null);
   };
@@ -199,13 +279,32 @@ export default function BoardScreen() {
       setIsAddingList(false);
       return;
     }
-    setColumns((prev) => [
-      ...prev,
-      { id: Date.now().toString(), title: newListTitle.trim(), tasks: [] },
-    ]);
+    addColumn(boardId, newListTitle.trim());
     setNewListTitle('');
     setIsAddingList(false);
   };
+
+  const commitTitleEdit = () => {
+    const trimmed = editingTitle.trim();
+    if (trimmed && trimmed !== board?.title) {
+      updateBoardMeta(boardId, { title: trimmed });
+    } else if (board) {
+      setEditingTitle(board.title);
+    }
+    setIsEditingBoardName(false);
+  };
+
+  const onOpenCard = (taskId: string) => {
+    router.push(`/workspaces/${workspaceId}/boards/${boardId}/cards/${taskId}`);
+  };
+
+  if (!board) {
+    return (
+      <View className="flex-1 bg-background items-center justify-center">
+        <Text className="text-muted-foreground">Loading board…</Text>
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-background p-4">
@@ -214,21 +313,35 @@ export default function BoardScreen() {
         <Text className="text-base text-muted-foreground font-medium">Back to Boards</Text>
       </Pressable>
 
-      {isEditingBoardName ? (
-        <Input
-          className="text-2xl font-bold h-12 mb-1 px-0 border-transparent focus:border-transparent bg-transparent"
-          value={boardName}
-          onChangeText={setBoardName}
-          autoFocus
-          onBlur={() => setIsEditingBoardName(false)}
-          onSubmitEditing={() => setIsEditingBoardName(false)}
-        />
-      ) : (
-        <Pressable onPress={() => setIsEditingBoardName(true)}>
-          <Text className="text-2xl font-bold text-foreground mb-1">{boardName}</Text>
+      <View className="flex-row items-start justify-between mb-1">
+        <View className="flex-1 pr-2">
+          {isEditingBoardName ? (
+            <Input
+              className="text-2xl font-bold h-12 mb-1 px-0 border-transparent focus:border-transparent bg-transparent"
+              value={editingTitle}
+              onChangeText={setEditingTitle}
+              autoFocus
+              onBlur={commitTitleEdit}
+              onSubmitEditing={commitTitleEdit}
+            />
+          ) : (
+            <Pressable onPress={() => setIsEditingBoardName(true)}>
+              <Text className="text-2xl font-bold text-foreground mb-1">{board.title}</Text>
+            </Pressable>
+          )}
+          <Text className="text-sm text-muted-foreground">Workspace: {workspaceId}</Text>
+        </View>
+        <Pressable
+          onPress={() => setIsLabelManagerOpen(true)}
+          className="flex-row items-center px-3 py-2 rounded-md border border-border active:bg-muted"
+          accessibilityLabel="Manage labels"
+        >
+          <Feather name="tag" size={14} className="text-muted-foreground" />
+          <Text className="text-xs text-foreground ml-1.5 font-medium">Manage labels</Text>
         </Pressable>
-      )}
-      <Text className="text-sm text-muted-foreground mb-6">Workspace: {workspaceId}</Text>
+      </View>
+
+      <View className="mb-6" />
 
       <ScrollView
         horizontal
@@ -246,8 +359,12 @@ export default function BoardScreen() {
                   <View className="bg-muted px-2 py-0.5 rounded-full mr-2">
                     <Text className="text-xs font-medium text-muted-foreground">{column.tasks.length}</Text>
                   </View>
-                  <Pressable onPress={() => handleDeleteList(column.id)} className="p-1">
-                    <Feather name="trash-2" size={16} className="text-muted-foreground hover:text-destructive" />
+                  <Pressable
+                    onPress={() => setDeletingColumnId(column.id)}
+                    className="p-1"
+                    accessibilityLabel={`Delete list ${column.title}`}
+                  >
+                    <Feather name="trash-2" size={16} className="text-muted-foreground" />
                   </Pressable>
                 </View>
               </View>
@@ -258,8 +375,13 @@ export default function BoardScreen() {
                     key={task.id}
                     task={task}
                     sourceColumnId={column.id}
+                    labels={labels}
+                    members={members}
                     onDrop={handleDrop}
-                    onDelete={handleDeleteCard}
+                    onOpenLabels={(tid, cid) => setActiveCardRef({ taskId: tid, columnId: cid, type: 'labels' })}
+                    onOpenMembers={(tid, cid) => setActiveCardRef({ taskId: tid, columnId: cid, type: 'members' })}
+                    onOpenDueDate={(tid, cid) => setActiveCardRef({ taskId: tid, columnId: cid, type: 'dueDate' })}
+                    onOpenCard={onOpenCard}
                   />
                 ))}
 
@@ -324,6 +446,58 @@ export default function BoardScreen() {
           )}
         </View>
       </ScrollView>
+
+      <LabelManagerModal
+        visible={isLabelManagerOpen}
+        labels={labels}
+        onClose={() => setIsLabelManagerOpen(false)}
+        onCreate={(payload) => addLabel(boardId, payload)}
+        onUpdate={(id, payload) => updateLabel(boardId, id, payload)}
+        onDelete={(id) => deleteLabel(boardId, id)}
+      />
+
+      <LabelPickerSheet
+        visible={activeCardRef?.type === 'labels'}
+        onClose={() => setActiveCardRef(null)}
+        boardLabels={labels}
+        attachedLabelIds={activeTask?.labelIds ?? []}
+        onToggleLabel={(label) => {
+          if (activeCardRef) toggleCardLabel(boardId, activeCardRef.taskId, label.id);
+        }}
+        onOpenManager={() => setIsLabelManagerOpen(true)}
+      />
+
+      <MemberPickerSheet
+        visible={activeCardRef?.type === 'members'}
+        onClose={() => setActiveCardRef(null)}
+        members={members}
+        assignedMemberIds={activeTask?.memberIds ?? []}
+        onToggleMember={(memberId) => {
+          if (activeCardRef) toggleCardMember(boardId, activeCardRef.taskId, memberId);
+        }}
+      />
+
+      <DueDatePickerSheet
+        visible={activeCardRef?.type === 'dueDate'}
+        onClose={() => setActiveCardRef(null)}
+        dueDate={activeTask?.dueDate ?? null}
+        onSetDueDate={(value) => {
+          if (activeCardRef) setCardDueDate(boardId, activeCardRef.taskId, value);
+        }}
+      />
+
+      <ConfirmDialog
+        visible={deletingColumnId !== null}
+        title="Delete list"
+        message="This will remove the list and all its cards. This action cannot be undone."
+        confirmLabel="Delete"
+        destructive
+        onClose={() => setDeletingColumnId(null)}
+        onConfirm={() => {
+          if (deletingColumnId) deleteColumn(boardId, deletingColumnId);
+          setDeletingColumnId(null);
+        }}
+      />
     </View>
   );
 }

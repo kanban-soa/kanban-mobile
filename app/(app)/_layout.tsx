@@ -50,12 +50,33 @@ export default function AppTabLayout() {
         }}
       />
       <Tabs.Screen
+        name="statistic/index"
+        options={{
+          title: "Stats",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="bar-chart-2" size={size ?? 20} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="settings"
         options={{
           title: "Settings",
           tabBarIcon: ({ color, size }) => (
             <Feather name="settings" size={size ?? 20} color={color} />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="statistic/activities"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="statistic/self"
+        options={{
+          href: null,
         }}
       />
       <Tabs.Screen
@@ -72,6 +93,12 @@ export default function AppTabLayout() {
       />
       <Tabs.Screen
         name="workspaces/[workspaceId]/boards/[boardId]"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="workspaces/[workspaceId]/boards/[boardId]/cards/[cardId]"
         options={{
           href: null,
         }}
