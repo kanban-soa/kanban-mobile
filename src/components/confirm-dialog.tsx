@@ -59,8 +59,20 @@ export function ConfirmDialog({
                 variant={destructive ? 'destructive' : 'default'}
                 size="sm"
                 onPress={onConfirm}
+                style={
+                  destructive
+                    ? { backgroundColor: '#dc2626' }
+                    : { backgroundColor: colors.foreground }
+                }
               >
-                <Text className="text-white">{confirmLabel}</Text>
+                <Text
+                  style={{
+                    color: destructive ? '#ffffff' : colors.background,
+                    fontWeight: '600',
+                  }}
+                >
+                  {confirmLabel}
+                </Text>
               </Button>
             </View>
           </View>

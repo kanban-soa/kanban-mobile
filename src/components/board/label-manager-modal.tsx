@@ -185,7 +185,7 @@ export function LabelManagerModal({
                             <Text className="text-muted-foreground">Cancel</Text>
                           </Button>
                           <Button size="sm" onPress={() => saveEdit(label.id)}>
-                            <Text className="text-white">Save</Text>
+                            <Text className="text-primary-foreground font-semibold">Save</Text>
                           </Button>
                         </View>
                       </View>
@@ -308,7 +308,7 @@ export function LabelManagerModal({
                       <Text className="text-muted-foreground">Cancel</Text>
                     </Button>
                     <Button size="sm" onPress={saveCreate}>
-                      <Text className="text-white">Create</Text>
+                      <Text className="text-primary-foreground font-semibold">Create</Text>
                     </Button>
                   </View>
                 </View>

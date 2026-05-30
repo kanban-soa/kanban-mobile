@@ -263,7 +263,7 @@ export function DueDatePickerSheet({
           }}
           disabled={!isValidDate}
         >
-          <Text className="text-white font-medium">Save</Text>
+          <Text className="text-primary-foreground font-semibold">Save</Text>
         </Button>
         {dueDate && (
           <Button

@@ -127,7 +127,7 @@ export function RoleSwitchModal({ visible, member, onClose, onConfirm }: Props) 
                 onPress={handleConfirm}
                 disabled={selectedRole === member.role}
               >
-                <Text className="text-white">Update role</Text>
+                <Text className="text-primary-foreground font-semibold">Update role</Text>
               </Button>
             </View>
           </View>

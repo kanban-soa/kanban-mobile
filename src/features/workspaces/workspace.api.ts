@@ -1,7 +1,8 @@
 import { api } from '~/lib/api';
-import { WORKSPACES } from '~/lib/api/routes';
+import { INVITATIONS, WORKSPACES } from '~/lib/api/routes';
 import type {
   ChangeRoleRequest,
+  CreateWorkspaceRequest,
   Invitation,
   InviteMemberRequest,
   MemberRequest,
@@ -14,6 +15,13 @@ function unwrap<T>(payload: T[] | { data: T[] } | null | undefined): T[] {
   return payload?.data ?? [];
 }
 
+function unwrapOne<T>(payload: T | { data: T }): T {
+  if (payload && typeof payload === 'object' && 'data' in payload) {
+    return (payload as { data: T }).data;
+  }
+  return payload as T;
+}
+
 export async function listWorkspaces(): Promise<Workspace[]> {
   const data = await api
     .get(WORKSPACES.LIST)
@@ -21,19 +29,37 @@ export async function listWorkspaces(): Promise<Workspace[]> {
   return unwrap(data);
 }
 
-export async function getWorkspace(id: string): Promise<Workspace> {
-  return api.get(WORKSPACES.DETAIL(id)).json<Workspace>();
+export async function getDefaultWorkspace(): Promise<Workspace> {
+  const data = await api
+    .get(WORKSPACES.DEFAULT)
+    .json<Workspace | { data: Workspace }>();
+  return unwrapOne(data);
 }
 
-export async function createWorkspace(name: string): Promise<Workspace> {
-  return api.post(WORKSPACES.CREATE, { json: { name } }).json<Workspace>();
+export async function getWorkspace(id: string): Promise<Workspace> {
+  const data = await api
+    .get(WORKSPACES.DETAIL(id))
+    .json<Workspace | { data: Workspace }>();
+  return unwrapOne(data);
+}
+
+export async function createWorkspace(
+  payload: CreateWorkspaceRequest,
+): Promise<Workspace> {
+  const data = await api
+    .post(WORKSPACES.CREATE, { json: payload })
+    .json<Workspace | { data: Workspace }>();
+  return unwrapOne(data);
 }
 
 export async function updateWorkspace(
   id: string,
   payload: UpdateWorkspaceRequest,
 ): Promise<Workspace> {
-  return api.patch(WORKSPACES.UPDATE(id), { json: payload }).json<Workspace>();
+  const data = await api
+    .patch(WORKSPACES.UPDATE(id), { json: payload })
+    .json<Workspace | { data: Workspace }>();
+  return unwrapOne(data);
 }
 
 export async function deleteWorkspace(id: string): Promise<void> {
@@ -51,19 +77,21 @@ export async function inviteMember(
   workspaceId: string,
   payload: InviteMemberRequest,
 ): Promise<Invitation> {
-  return api
+  const data = await api
     .post(WORKSPACES.INVITE(workspaceId), { json: payload })
-    .json<Invitation>();
+    .json<Invitation | { data: Invitation }>();
+  return unwrapOne(data);
 }
 
 export async function changeRole(
   workspaceId: string,
   memberId: string,
   payload: ChangeRoleRequest,
-): Promise<ChangeRoleRequest> {
-  return api
+): Promise<Invitation> {
+  const data = await api
     .patch(WORKSPACES.CHANGE_ROLE(workspaceId, memberId), { json: payload })
-    .json<ChangeRoleRequest>();
+    .json<Invitation | { data: Invitation }>();
+  return unwrapOne(data);
 }
 
 export async function removeMember(
@@ -85,4 +113,19 @@ export async function removeInvitation(
   invitationId: string,
 ): Promise<void> {
   await api.delete(WORKSPACES.REMOVE_INVITATION(workspaceId, invitationId));
+}
+
+export async function getMyInvitations(): Promise<Invitation[]> {
+  const data = await api
+    .get(WORKSPACES.MY_INVITATIONS)
+    .json<Invitation[] | { data: Invitation[] }>();
+  return unwrap(data);
+}
+
+export async function acceptInvitation(invitationId: string): Promise<void> {
+  await api.patch(INVITATIONS.ACCEPT(invitationId));
+}
+
+export async function rejectInvitation(invitationId: string): Promise<void> {
+  await api.patch(INVITATIONS.REJECT(invitationId));
 }

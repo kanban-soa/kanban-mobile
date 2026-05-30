@@ -1,6 +1,14 @@
 import { Link, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
-import { View, Text, FlatList, Pressable, Modal } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  Pressable,
+  RefreshControl,
+  Text,
+  View,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 import { Button } from '~/components/ui/button';
@@ -11,27 +19,31 @@ import {
   type BoardFormValues,
 } from '~/components/board/board-form-dialog';
 import { WorkspaceBanner } from '~/components/workspace-banner';
+import {
+  useBoards,
+  useCreateBoard,
+  useDeleteBoard,
+  useUpdateBoard,
+} from '~/hooks/use-board';
 import { useSurfaceColors } from '~/lib/surface-colors';
-
-type BoardItem = { id: string; title: string; description: string };
-
-const INITIAL_BOARDS: BoardItem[] = [
-  { id: 'default-board', title: 'Product Roadmap', description: 'Q3/Q4 planning and feature tracking.' },
-  { id: '2', title: 'Sprint Board', description: 'Current active sprint tasks and issues.' },
-  { id: '3', title: 'Design System', description: 'UI components and design tokens.' },
-];
+import type { Board } from '~/lib/api/types';
 
 export default function BoardsScreen() {
   const { workspaceId } = useLocalSearchParams<{ workspaceId: string }>();
   const colors = useSurfaceColors();
 
-  const [boards, setBoards] = useState<BoardItem[]>(INITIAL_BOARDS);
+  const { data: boards = [], isLoading, isError, refetch, isRefetching } =
+    useBoards(workspaceId);
+  const createMutation = useCreateBoard(workspaceId ?? '');
+  const updateMutation = useUpdateBoard(workspaceId ?? '');
+  const deleteMutation = useDeleteBoard(workspaceId ?? '');
+
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<'create' | 'edit' | null>(null);
-  const [editingBoard, setEditingBoard] = useState<BoardItem | null>(null);
-  const [deletingBoard, setDeletingBoard] = useState<BoardItem | null>(null);
+  const [editingBoard, setEditingBoard] = useState<Board | null>(null);
+  const [deletingBoard, setDeletingBoard] = useState<Board | null>(null);
 
-  const activeMenuBoard = boards.find((b) => b.id === activeMenuId) ?? null;
+  const activeMenuBoard = boards.find((b) => b.publicId === activeMenuId) ?? null;
   const closeMenu = () => setActiveMenuId(null);
 
   const openCreate = () => {
@@ -39,35 +51,44 @@ export default function BoardsScreen() {
     setFormMode('create');
   };
 
-  const openEdit = (board: BoardItem) => {
+  const openEdit = (board: Board) => {
     setEditingBoard(board);
     setFormMode('edit');
     closeMenu();
   };
 
-  const handleFormSubmit = (values: BoardFormValues) => {
-    if (formMode === 'create') {
-      setBoards((prev) => [
-        { id: Date.now().toString(), title: values.title, description: values.description || 'New board.' },
-        ...prev,
-      ]);
-    } else if (formMode === 'edit' && editingBoard) {
-      setBoards((prev) =>
-        prev.map((b) =>
-          b.id === editingBoard.id
-            ? { ...b, title: values.title, description: values.description || b.description }
-            : b,
-        ),
-      );
+  const handleFormSubmit = async (values: BoardFormValues) => {
+    try {
+      if (formMode === 'create') {
+        await createMutation.mutateAsync({
+          title: values.title,
+          description: values.description || undefined,
+        });
+      } else if (formMode === 'edit' && editingBoard) {
+        await updateMutation.mutateAsync({
+          boardId: editingBoard.publicId,
+          payload: {
+            title: values.title,
+            description: values.description || undefined,
+          },
+        });
+      }
+      setFormMode(null);
+      setEditingBoard(null);
+    } catch (err) {
+      console.error('Board save failed', err);
     }
-    setFormMode(null);
-    setEditingBoard(null);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deletingBoard) return;
-    setBoards((prev) => prev.filter((b) => b.id !== deletingBoard.id));
-    setDeletingBoard(null);
+    try {
+      await deleteMutation.mutateAsync(deletingBoard.publicId);
+    } catch (err) {
+      console.error('Board delete failed', err);
+    } finally {
+      setDeletingBoard(null);
+    }
   };
 
   return (
@@ -85,40 +106,53 @@ export default function BoardsScreen() {
         </Button>
       </View>
 
-      <FlatList
-        data={boards}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <Card className="mb-4 p-5">
-            <View className="flex-row items-start justify-between">
-              <Link
-                href={`/workspaces/${workspaceId}/boards/${item.id}`}
-                asChild
-                style={{ flex: 1 }}
-              >
-                <Pressable className="flex-1 pr-2">
-                  <Text className="text-lg font-semibold text-foreground mb-1">{item.title}</Text>
-                  <Text className="text-sm text-muted-foreground" numberOfLines={2}>
-                    {item.description}
-                  </Text>
+      {isLoading ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator />
+        </View>
+      ) : (
+        <FlatList
+          data={boards}
+          keyExtractor={(item) => item.publicId}
+          refreshControl={
+            <RefreshControl refreshing={isRefetching} onRefresh={refetch} />
+          }
+          renderItem={({ item }) => (
+            <Card className="mb-4 p-5">
+              <View className="flex-row items-start justify-between">
+                <Link
+                  href={`/workspaces/${workspaceId}/boards/${item.publicId}`}
+                  asChild
+                  style={{ flex: 1 }}
+                >
+                  <Pressable className="flex-1 pr-2">
+                    <Text className="text-lg font-semibold text-foreground mb-1">
+                      {item.title ?? item.name}
+                    </Text>
+                    <Text className="text-sm text-muted-foreground" numberOfLines={2}>
+                      {item.description ?? 'No description.'}
+                    </Text>
+                  </Pressable>
+                </Link>
+                <Pressable
+                  onPress={() => setActiveMenuId(item.publicId)}
+                  accessibilityLabel={`Open actions for ${item.title ?? item.name}`}
+                  className="p-2"
+                >
+                  <Feather name="more-vertical" size={18} className="text-muted-foreground" />
                 </Pressable>
-              </Link>
-              <Pressable
-                onPress={() => setActiveMenuId(item.id)}
-                accessibilityLabel={`Open actions for ${item.title}`}
-                className="p-2"
-              >
-                <Feather name="more-vertical" size={18} className="text-muted-foreground" />
-              </Pressable>
+              </View>
+            </Card>
+          )}
+          ListEmptyComponent={
+            <View className="flex-1 items-center justify-center mt-10">
+              <Text className="text-muted-foreground">
+                {isError ? 'Failed to load boards.' : 'No boards found.'}
+              </Text>
             </View>
-          </Card>
-        )}
-        ListEmptyComponent={
-          <View className="flex-1 items-center justify-center mt-10">
-            <Text className="text-muted-foreground">No boards found.</Text>
-          </View>
-        }
-      />
+          }
+        />
+      )}
 
       <Modal
         visible={activeMenuBoard !== null}
@@ -152,7 +186,7 @@ export default function BoardsScreen() {
                     style={{ backgroundColor: colors.border }}
                   />
                   <Text className="text-base font-semibold text-foreground mb-4">
-                    {activeMenuBoard.title}
+                    {activeMenuBoard.title ?? activeMenuBoard.name}
                   </Text>
 
                   <ActionRow
@@ -185,7 +219,10 @@ export default function BoardsScreen() {
         mode={formMode ?? 'create'}
         initialValues={
           editingBoard
-            ? { title: editingBoard.title, description: editingBoard.description }
+            ? {
+                title: editingBoard.title ?? editingBoard.name,
+                description: editingBoard.description ?? '',
+              }
             : undefined
         }
         onClose={() => {
@@ -200,7 +237,7 @@ export default function BoardsScreen() {
         title="Delete board"
         message={
           deletingBoard
-            ? `This will permanently delete "${deletingBoard.title}" and all its contents. This action cannot be undone.`
+            ? `This will permanently delete "${deletingBoard.title ?? deletingBoard.name}" and all its contents. This action cannot be undone.`
             : ''
         }
         confirmLabel="Delete"

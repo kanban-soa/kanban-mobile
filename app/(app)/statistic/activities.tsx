@@ -1,32 +1,20 @@
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  Text,
+  View,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 import { Badge } from '~/components/ui/badge';
 import { Button } from '~/components/ui/button';
 import { Card } from '~/components/ui/card';
 import { WorkspaceBanner } from '~/components/workspace-banner';
-
-type Activity = {
-  id: string;
-  actor: string;
-  action: string;
-  entity: string;
-  target: string;
-  context?: string;
-  createdAt: string;
-};
-
-const MOCK_ACTIVITIES: Activity[] = Array.from({ length: 28 }).map((_, i) => ({
-  id: `${i + 1}`,
-  actor: ['Jane Smith', 'John Doe', 'Bob Johnson', 'You'][i % 4],
-  action: ['card.create', 'card.update', 'board.update', 'card.move', 'card.complete'][i % 5],
-  entity: i % 3 === 0 ? 'board' : 'card',
-  target: ['API auth', 'Onboarding flow', 'Marketing roadmap', 'CI pipeline', 'User research'][i % 5],
-  context: i % 2 === 0 ? 'In Progress' : undefined,
-  createdAt: `2026-05-${String(26 - (i % 14)).padStart(2, '0')}T${String(8 + (i % 10)).padStart(2, '0')}:${String((i * 7) % 60).padStart(2, '0')}`,
-}));
+import { useWorkspaceActivities } from '~/hooks/use-statistics';
+import { useActiveWorkspaceStore } from '~/store/active-workspace.store';
 
 const PAGE_SIZE = 10;
 
@@ -48,13 +36,17 @@ function formatInitials(value: string) {
 
 export default function ActivityLogScreen() {
   const router = useRouter();
-  const [page, setPage] = useState(1);
+  const activeWorkspace = useActiveWorkspaceStore((s) => s.activeWorkspace);
+  const workspaceId = activeWorkspace?.id;
 
-  const totalPages = Math.max(1, Math.ceil(MOCK_ACTIVITIES.length / PAGE_SIZE));
-  const visible = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return MOCK_ACTIVITIES.slice(start, start + PAGE_SIZE);
-  }, [page]);
+  const [page, setPage] = useState(1);
+  const { data, isLoading, isError } = useWorkspaceActivities(workspaceId, {
+    page,
+    limit: PAGE_SIZE,
+  });
+
+  const items = data?.items ?? [];
+  const totalPages = data?.pagination.totalPages ?? 1;
 
   return (
     <View className="flex-1 bg-background p-4">
@@ -74,79 +66,106 @@ export default function ActivityLogScreen() {
         </Pressable>
       </View>
 
-      <FlatList
-        data={visible}
-        keyExtractor={(item) => item.id}
-        ItemSeparatorComponent={() => <View className="h-2" />}
-        ListEmptyComponent={
-          <Card>
-            <Text className="text-sm text-muted-foreground">No activity yet.</Text>
-          </Card>
-        }
-        renderItem={({ item }) => (
-          <Card className="flex-row items-center gap-3">
-            <View className="h-10 w-10 items-center justify-center rounded-full bg-muted">
-              <Text className="text-xs font-bold text-foreground">{formatInitials(item.actor)}</Text>
-            </View>
-            <View className="flex-1">
-              <Text className="text-sm text-foreground" numberOfLines={2}>
-                <Text className="font-semibold text-primary">{item.actor}</Text>{' '}
-                <Text className="italic text-muted-foreground">{item.action}</Text>{' '}
-                on <Text className="font-semibold">{item.entity}</Text>{' '}
-                <Text className="text-muted-foreground">{item.target}</Text>
-                {item.context && (
-                  <>
-                    {' '}
-                    in <Text className="font-medium">{item.context}</Text>
-                  </>
-                )}
-              </Text>
-              <Text className="mt-0.5 text-xs text-muted-foreground">
-                {formatDate(item.createdAt)}
-              </Text>
-            </View>
-            <Badge variant="outline">
-              <Text className="text-[10px] uppercase">{item.action.split('.')[1]}</Text>
-            </Badge>
-          </Card>
-        )}
-      />
-
-      <View className="mt-4 flex-row items-center justify-between">
-        <Text className="text-xs text-muted-foreground">
-          Page {page} of {totalPages}
-        </Text>
-        <View className="flex-row gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={page <= 1}
-            onPress={() => setPage(1)}>
-            <Feather name="chevrons-left" size={14} className="text-foreground" />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={page <= 1}
-            onPress={() => setPage((p) => Math.max(1, p - 1))}>
-            <Feather name="chevron-left" size={14} className="text-foreground" />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={page >= totalPages}
-            onPress={() => setPage((p) => Math.min(totalPages, p + 1))}>
-            <Feather name="chevron-right" size={14} className="text-foreground" />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={page >= totalPages}
-            onPress={() => setPage(totalPages)}>
-            <Feather name="chevrons-right" size={14} className="text-foreground" />
-          </Button>
+      {!workspaceId ? (
+        <Card>
+          <Text className="text-sm text-muted-foreground">
+            Select a workspace to view activity.
+          </Text>
+        </Card>
+      ) : isLoading ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator />
         </View>
-      </View>
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={(item) => item.publicId}
+          ItemSeparatorComponent={() => <View className="h-2" />}
+          ListEmptyComponent={
+            <Card>
+              <Text className="text-sm text-muted-foreground">
+                {isError ? 'Failed to load activity.' : 'No activity yet.'}
+              </Text>
+            </Card>
+          }
+          renderItem={({ item }) => {
+            const [, verb] = item.actionType.split('.');
+            const actor =
+              (item.metadata.actor as { name?: string })?.name ?? 'Someone';
+            const target =
+              item.metadata.title ?? item.metadata.name ?? item.entityId;
+            const context =
+              item.metadata.boardName ?? item.metadata.listName ?? undefined;
+            return (
+              <Card className="flex-row items-center gap-3">
+                <View className="h-10 w-10 items-center justify-center rounded-full bg-muted">
+                  <Text className="text-xs font-bold text-foreground">
+                    {formatInitials(actor)}
+                  </Text>
+                </View>
+                <View className="flex-1">
+                  <Text className="text-sm text-foreground" numberOfLines={2}>
+                    <Text className="font-semibold text-primary">{actor}</Text>{' '}
+                    <Text className="italic text-muted-foreground">{verb}</Text>{' '}
+                    on <Text className="font-semibold">{item.entityType}</Text>{' '}
+                    <Text className="text-muted-foreground">{target}</Text>
+                    {context && (
+                      <>
+                        {' '}
+                        in <Text className="font-medium">{context}</Text>
+                      </>
+                    )}
+                  </Text>
+                  <Text className="mt-0.5 text-xs text-muted-foreground">
+                    {formatDate(item.createdAt)}
+                  </Text>
+                </View>
+                <Badge variant="outline">
+                  <Text className="text-[10px] uppercase">{verb}</Text>
+                </Badge>
+              </Card>
+            );
+          }}
+        />
+      )}
+
+      {workspaceId && !isLoading && (
+        <View className="mt-4 flex-row items-center justify-between">
+          <Text className="text-xs text-muted-foreground">
+            Page {page} of {totalPages}
+          </Text>
+          <View className="flex-row gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={page <= 1}
+              onPress={() => setPage(1)}>
+              <Feather name="chevrons-left" size={14} className="text-foreground" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={page <= 1}
+              onPress={() => setPage((p) => Math.max(1, p - 1))}>
+              <Feather name="chevron-left" size={14} className="text-foreground" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={page >= totalPages}
+              onPress={() => setPage((p) => Math.min(totalPages, p + 1))}>
+              <Feather name="chevron-right" size={14} className="text-foreground" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={page >= totalPages}
+              onPress={() => setPage(totalPages)}>
+              <Feather name="chevrons-right" size={14} className="text-foreground" />
+            </Button>
+          </View>
+        </View>
+      )}
     </View>
   );
 }

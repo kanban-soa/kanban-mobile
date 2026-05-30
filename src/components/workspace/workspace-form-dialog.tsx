@@ -1,5 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Pressable, Text, TextInput, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 import { Button } from '~/components/ui/button';
@@ -41,12 +49,16 @@ export function WorkspaceFormDialog({ visible, mode, initialValues, onClose, onS
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable
-        className="flex-1 justify-center px-4"
-        style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-        onPress={onClose}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
       >
-        <Pressable onPress={(e) => e.stopPropagation()}>
+        <Pressable
+          className="flex-1 justify-center px-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onPress={onClose}
+        >
+          <Pressable onPress={(e) => e.stopPropagation()}>
           <View
             className="rounded-2xl p-5"
             style={{
@@ -90,12 +102,15 @@ export function WorkspaceFormDialog({ visible, mode, initialValues, onClose, onS
                 <Text className="text-foreground">Cancel</Text>
               </Button>
               <Button size="sm" onPress={handleSubmit} disabled={!name.trim()}>
-                <Text className="text-white">{isEdit ? 'Save changes' : 'Create'}</Text>
+                <Text className="text-primary-foreground font-semibold">
+                  {isEdit ? 'Save changes' : 'Create'}
+                </Text>
               </Button>
             </View>
           </View>
         </Pressable>
-      </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

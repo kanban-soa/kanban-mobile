@@ -1,9 +1,16 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
-import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
+import { Avatar, AvatarFallback } from '~/components/ui/avatar';
 import { Button } from '~/components/ui/button';
 import { Card } from '~/components/ui/card';
 import { ConfirmDialog } from '~/components/confirm-dialog';
@@ -11,9 +18,37 @@ import {
   DueDatePickerSheet,
   LabelPickerSheet,
   MemberPickerSheet,
+  type WorkspaceMember,
 } from '~/components/board/card-quick-actions';
 import { LabelManagerModal } from '~/components/board/label-manager-modal';
-import { useBoardStore } from '~/store/board.store';
+import {
+  useAssignCardMember,
+  useAttachCardLabel,
+  useBoard,
+  useCard,
+  useClearCardDueDate,
+  useCreateLabel,
+  useDeleteCard,
+  useDeleteLabel,
+  useDetachCardLabel,
+  useLabels,
+  useSetCardDueDate,
+  useUnassignCardMember,
+  useUpdateCard,
+  useUpdateLabel,
+} from '~/hooks/use-board';
+import { useMembers } from '~/hooks/use-workspaces';
+import type { Label as ApiLabel } from '~/lib/api/types';
+
+type DisplayLabel = { id: string; name: string; color: string };
+
+function toDisplayLabel(label: ApiLabel): DisplayLabel {
+  return {
+    id: label.publicId ?? label.id,
+    name: label.name,
+    color: label.color ?? label.colourCode ?? '#64748b',
+  };
+}
 
 function formatDueDate(value: string): string {
   const d = new Date(value);
@@ -33,25 +68,40 @@ export default function CardDetailScreen() {
   }>();
   const router = useRouter();
 
-  const board = useBoardStore((s) => s.boards[boardId]);
-  const members = useBoardStore((s) => s.members);
-  const updateCard = useBoardStore((s) => s.updateCard);
-  const deleteCard = useBoardStore((s) => s.deleteCard);
-  const toggleCardLabel = useBoardStore((s) => s.toggleCardLabel);
-  const toggleCardMember = useBoardStore((s) => s.toggleCardMember);
-  const setCardDueDate = useBoardStore((s) => s.setCardDueDate);
-  const addLabel = useBoardStore((s) => s.addLabel);
-  const updateLabel = useBoardStore((s) => s.updateLabel);
-  const deleteLabel = useBoardStore((s) => s.deleteLabel);
+  const { data: card, isLoading: cardLoading, isError } = useCard(cardId);
+  const { data: board } = useBoard(workspaceId, boardId);
+  const { data: labelsData = [] } = useLabels(boardId);
+  const { data: workspaceMembers = [] } = useMembers(workspaceId ?? '');
 
-  const cardInfo = useMemo(() => {
-    if (!board) return null;
-    for (const c of board.columns) {
-      const task = c.tasks.find((t) => t.id === cardId);
-      if (task) return { task, column: c };
-    }
-    return null;
-  }, [board, cardId]);
+  const updateCardMutation = useUpdateCard();
+  const deleteCardMutation = useDeleteCard();
+  const attachLabelMutation = useAttachCardLabel();
+  const detachLabelMutation = useDetachCardLabel();
+  const setDueDateMutation = useSetCardDueDate();
+  const clearDueDateMutation = useClearCardDueDate();
+  const assignMemberMutation = useAssignCardMember();
+  const unassignMemberMutation = useUnassignCardMember();
+  const createLabelMutation = useCreateLabel(boardId ?? '');
+  const updateLabelMutation = useUpdateLabel(boardId ?? '');
+  const deleteLabelMutation = useDeleteLabel(boardId ?? '');
+
+  const labels = useMemo(() => labelsData.map(toDisplayLabel), [labelsData]);
+  const members: WorkspaceMember[] = useMemo(
+    () =>
+      workspaceMembers.map((m) => ({
+        id: m.publicId,
+        name: m.name?.trim() || m.email.split('@')[0],
+        email: m.email,
+        avatarUrl: null,
+      })),
+    [workspaceMembers],
+  );
+
+  const cardLabelIds = useMemo(
+    () => (card?.labels ?? []).map((l) => l.publicId ?? l.id),
+    [card],
+  );
+  const cardMemberIds = card?.members ?? [];
 
   const [titleDraft, setTitleDraft] = useState('');
   const [descriptionDraft, setDescriptionDraft] = useState('');
@@ -63,13 +113,21 @@ export default function CardDetailScreen() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
   useEffect(() => {
-    if (cardInfo) {
-      setTitleDraft(cardInfo.task.title);
-      setDescriptionDraft(cardInfo.task.description);
+    if (card) {
+      setTitleDraft(card.title);
+      setDescriptionDraft(card.description ?? '');
     }
-  }, [cardInfo?.task.title, cardInfo?.task.description]);
+  }, [card?.title, card?.description, card]);
 
-  if (!board || !cardInfo) {
+  if (cardLoading) {
+    return (
+      <View className="flex-1 bg-background items-center justify-center">
+        <ActivityIndicator />
+      </View>
+    );
+  }
+
+  if (isError || !card) {
     return (
       <View className="flex-1 bg-background items-center justify-center px-6">
         <Text className="text-muted-foreground mb-4">Card not found.</Text>
@@ -80,30 +138,43 @@ export default function CardDetailScreen() {
     );
   }
 
-  const { task, column } = cardInfo;
-  const attachedLabels = board.labels.filter((l) => task.labelIds.includes(l.id));
-  const assignedMembers = members.filter((m) => task.memberIds.includes(m.id));
+  const boardTitle = board?.title ?? board?.name ?? 'Board';
+  const listName = card.list?.name ?? '';
+  const attachedLabels = labels.filter((l) => cardLabelIds.includes(l.id));
+  const assignedMembers = members.filter((m) => cardMemberIds.includes(m.id));
 
   const commitTitle = () => {
     const trimmed = titleDraft.trim();
-    if (trimmed && trimmed !== task.title) {
-      updateCard(boardId, task.id, { title: trimmed });
+    if (trimmed && trimmed !== card.title) {
+      updateCardMutation.mutate({
+        cardId: card.publicId ?? card.id,
+        payload: { title: trimmed },
+      });
     } else {
-      setTitleDraft(task.title);
+      setTitleDraft(card.title);
     }
   };
 
   const commitDescription = () => {
-    if (descriptionDraft !== task.description) {
-      updateCard(boardId, task.id, { description: descriptionDraft });
+    const next = descriptionDraft;
+    if (next !== (card.description ?? '')) {
+      updateCardMutation.mutate({
+        cardId: card.publicId ?? card.id,
+        payload: { description: next },
+      });
     }
   };
 
   const handleDelete = () => {
-    deleteCard(boardId, task.id);
-    setIsDeleteOpen(false);
-    router.replace(`/workspaces/${workspaceId}/boards/${boardId}`);
+    deleteCardMutation.mutate(card.publicId ?? card.id, {
+      onSettled: () => {
+        setIsDeleteOpen(false);
+        router.replace(`/workspaces/${workspaceId}/boards/${boardId}`);
+      },
+    });
   };
+
+  const activeCardId = card.publicId ?? card.id;
 
   return (
     <View className="flex-1 bg-background">
@@ -114,9 +185,7 @@ export default function CardDetailScreen() {
           accessibilityLabel="Back"
         >
           <Feather name="arrow-left" size={20} className="text-muted-foreground mr-2" />
-          <Text className="text-base text-muted-foreground font-medium">
-            {board.title}
-          </Text>
+          <Text className="text-base text-muted-foreground font-medium">{boardTitle}</Text>
         </Pressable>
         <Pressable
           onPress={() => router.back()}
@@ -132,9 +201,11 @@ export default function CardDetailScreen() {
         contentContainerStyle={{ padding: 16, paddingBottom: 48 }}
         showsVerticalScrollIndicator={false}
       >
-        <Text className="text-xs text-muted-foreground mb-2">
-          In list <Text className="font-medium text-foreground">{column.title}</Text>
-        </Text>
+        {listName ? (
+          <Text className="text-xs text-muted-foreground mb-2">
+            In list <Text className="font-medium text-foreground">{listName}</Text>
+          </Text>
+        ) : null}
 
         <TextInput
           value={titleDraft}
@@ -216,7 +287,6 @@ export default function CardDetailScreen() {
               {assignedMembers.map((m) => (
                 <View key={m.id} className="flex-row items-center py-2">
                   <Avatar className="h-8 w-8 mr-3">
-                    {m.avatarUrl && <AvatarImage source={{ uri: m.avatarUrl }} />}
                     <AvatarFallback initials={m.name.charAt(0).toUpperCase()} />
                   </Avatar>
                   <View className="flex-1">
@@ -244,7 +314,7 @@ export default function CardDetailScreen() {
             </Pressable>
           </View>
           <Text className="text-sm text-foreground">
-            {task.dueDate ? formatDueDate(task.dueDate) : 'No due date.'}
+            {card.dueDate ? formatDueDate(card.dueDate) : 'No due date.'}
           </Text>
         </Card>
 
@@ -260,9 +330,15 @@ export default function CardDetailScreen() {
       <LabelPickerSheet
         visible={activeSheet === 'labels'}
         onClose={() => setActiveSheet(null)}
-        boardLabels={board.labels}
-        attachedLabelIds={task.labelIds}
-        onToggleLabel={(label) => toggleCardLabel(boardId, task.id, label.id)}
+        boardLabels={labels}
+        attachedLabelIds={cardLabelIds}
+        onToggleLabel={(label, isAttached) => {
+          if (isAttached) {
+            detachLabelMutation.mutate({ cardId: activeCardId, labelId: label.id });
+          } else {
+            attachLabelMutation.mutate({ cardId: activeCardId, labelId: label.id });
+          }
+        }}
         onOpenManager={() => setIsLabelManagerOpen(true)}
       />
 
@@ -270,24 +346,49 @@ export default function CardDetailScreen() {
         visible={activeSheet === 'members'}
         onClose={() => setActiveSheet(null)}
         members={members}
-        assignedMemberIds={task.memberIds}
-        onToggleMember={(memberId) => toggleCardMember(boardId, task.id, memberId)}
+        assignedMemberIds={cardMemberIds}
+        onToggleMember={(memberId, isAssigned) => {
+          if (isAssigned) {
+            unassignMemberMutation.mutate({ cardId: activeCardId, memberId });
+          } else {
+            assignMemberMutation.mutate({
+              cardId: activeCardId,
+              workspaceMemberPublicId: memberId,
+            });
+          }
+        }}
       />
 
       <DueDatePickerSheet
         visible={activeSheet === 'dueDate'}
         onClose={() => setActiveSheet(null)}
-        dueDate={task.dueDate}
-        onSetDueDate={(value) => setCardDueDate(boardId, task.id, value)}
+        dueDate={card.dueDate ?? null}
+        onSetDueDate={(value) => {
+          if (value === null) {
+            clearDueDateMutation.mutate(activeCardId);
+          } else {
+            setDueDateMutation.mutate({
+              cardId: activeCardId,
+              dueDate: new Date(value).toISOString(),
+            });
+          }
+        }}
       />
 
       <LabelManagerModal
         visible={isLabelManagerOpen}
-        labels={board.labels}
+        labels={labels}
         onClose={() => setIsLabelManagerOpen(false)}
-        onCreate={(payload) => addLabel(boardId, payload)}
-        onUpdate={(id, payload) => updateLabel(boardId, id, payload)}
-        onDelete={(id) => deleteLabel(boardId, id)}
+        onCreate={(payload) =>
+          createLabelMutation.mutate({ name: payload.name, colourCode: payload.color })
+        }
+        onUpdate={(id, payload) =>
+          updateLabelMutation.mutate({
+            labelId: id,
+            payload: { name: payload.name, colourCode: payload.color },
+          })
+        }
+        onDelete={(id) => deleteLabelMutation.mutate(id)}
       />
 
       <ConfirmDialog

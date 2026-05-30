@@ -1,20 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
+  acceptInvitation,
   changeRole,
   createWorkspace,
   deleteWorkspace,
+  getDefaultWorkspace,
   getInvitations,
   getMembers,
+  getMyInvitations,
   getWorkspace,
   inviteMember,
   listWorkspaces,
+  rejectInvitation,
   removeInvitation,
   removeMember,
   updateWorkspace,
 } from '~/features/workspaces/workspace.api';
 import type {
   ChangeRoleRequest,
+  CreateWorkspaceRequest,
   InviteMemberRequest,
   UpdateWorkspaceRequest,
 } from '~/lib/api/types';
@@ -23,6 +28,13 @@ export function useWorkspaces() {
   return useQuery({
     queryKey: ['workspaces'],
     queryFn: listWorkspaces,
+  });
+}
+
+export function useDefaultWorkspace() {
+  return useQuery({
+    queryKey: ['workspaces', 'default'],
+    queryFn: getDefaultWorkspace,
   });
 }
 
@@ -37,7 +49,7 @@ export function useWorkspace(id: string) {
 export function useCreateWorkspace() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: createWorkspace,
+    mutationFn: (payload: CreateWorkspaceRequest) => createWorkspace(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workspaces'] });
     },
@@ -47,7 +59,8 @@ export function useCreateWorkspace() {
 export function useUpdateWorkspace(workspaceId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: UpdateWorkspaceRequest) => updateWorkspace(workspaceId, payload),
+    mutationFn: (payload: UpdateWorkspaceRequest) =>
+      updateWorkspace(workspaceId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workspaces'] });
       queryClient.invalidateQueries({ queryKey: ['workspaces', workspaceId] });
@@ -76,20 +89,33 @@ export function useMembers(workspaceId: string) {
 export function useInviteMember(workspaceId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: InviteMemberRequest) => inviteMember(workspaceId, payload),
+    mutationFn: (payload: InviteMemberRequest) =>
+      inviteMember(workspaceId, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workspaces', workspaceId] });
-      queryClient.invalidateQueries({ queryKey: ['workspaces', workspaceId, 'invitations'] });
+      queryClient.invalidateQueries({
+        queryKey: ['workspaces', workspaceId, 'members'],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['workspaces', workspaceId, 'invitations'],
+      });
     },
   });
 }
 
-export function useChangeRole(workspaceId: string, memberId: string) {
+export function useChangeRole(workspaceId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: ChangeRoleRequest) => changeRole(workspaceId, memberId, payload),
+    mutationFn: ({
+      memberId,
+      payload,
+    }: {
+      memberId: string;
+      payload: ChangeRoleRequest;
+    }) => changeRole(workspaceId, memberId, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workspaces', workspaceId] });
+      queryClient.invalidateQueries({
+        queryKey: ['workspaces', workspaceId, 'members'],
+      });
     },
   });
 }
@@ -99,7 +125,9 @@ export function useRemoveMember(workspaceId: string) {
   return useMutation({
     mutationFn: (memberId: string) => removeMember(workspaceId, memberId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workspaces', workspaceId] });
+      queryClient.invalidateQueries({
+        queryKey: ['workspaces', workspaceId, 'members'],
+      });
     },
   });
 }
@@ -115,9 +143,40 @@ export function useInvitations(workspaceId: string) {
 export function useRemoveInvitation(workspaceId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (invitationId: string) => removeInvitation(workspaceId, invitationId),
+    mutationFn: (invitationId: string) =>
+      removeInvitation(workspaceId, invitationId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workspaces', workspaceId, 'invitations'] });
+      queryClient.invalidateQueries({
+        queryKey: ['workspaces', workspaceId, 'invitations'],
+      });
+    },
+  });
+}
+
+export function useMyInvitations() {
+  return useQuery({
+    queryKey: ['invitations', 'me'],
+    queryFn: getMyInvitations,
+  });
+}
+
+export function useAcceptInvitation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (invitationId: string) => acceptInvitation(invitationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invitations', 'me'] });
+      queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+    },
+  });
+}
+
+export function useRejectInvitation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (invitationId: string) => rejectInvitation(invitationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invitations', 'me'] });
     },
   });
 }
