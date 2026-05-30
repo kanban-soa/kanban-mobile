@@ -1,97 +1,105 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, FlatList, Modal, Pressable, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  Pressable,
+  RefreshControl,
+  Text,
+  View,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 import { Button } from '~/components/ui/button';
 import { Card } from '~/components/ui/card';
-import { Input } from '~/components/ui/input';
+import { ConfirmDialog } from '~/components/confirm-dialog';
+import {
+  WorkspaceFormDialog,
+  type WorkspaceFormValues,
+} from '~/components/workspace/workspace-form-dialog';
+import {
+  useCreateWorkspace,
+  useDeleteWorkspace,
+  useUpdateWorkspace,
+  useWorkspaces,
+} from '~/hooks/use-workspaces';
 import { useActiveWorkspaceStore } from '~/store/active-workspace.store';
-
-type Workspace = {
-  id: string;
-  name: string;
-  description: string;
-};
-
-const INITIAL_WORKSPACES: Workspace[] = [
-  { id: 'default', name: 'Personal Workspace', description: 'My private projects and tasks.' },
-  { id: 'school', name: 'School Projects', description: 'Assignments and group work.' },
-  { id: 'work', name: 'Development Team', description: 'Work related boards and roadmaps.' },
-];
+import { useSurfaceColors } from '~/lib/surface-colors';
+import type { Workspace } from '~/lib/api/types';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const colors = useSurfaceColors();
   const setActiveWorkspace = useActiveWorkspaceStore((state) => state.setActiveWorkspace);
   const clearActiveWorkspace = useActiveWorkspaceStore((state) => state.clearActiveWorkspace);
 
-  const [workspaces, setWorkspaces] = useState<Workspace[]>(INITIAL_WORKSPACES);
-  const [isAddingWorkspace, setIsAddingWorkspace] = useState(false);
-  const [newWorkspaceName, setNewWorkspaceName] = useState('');
+  const { data: workspaces = [], isLoading, isError, refetch, isRefetching } = useWorkspaces();
+  const createMutation = useCreateWorkspace();
+  const deleteMutation = useDeleteWorkspace();
 
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [formMode, setFormMode] = useState<'create' | 'edit' | null>(null);
   const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
-  const [editingName, setEditingName] = useState('');
+  const [deletingWorkspace, setDeletingWorkspace] = useState<Workspace | null>(null);
 
-  const activeMenuWorkspace = workspaces.find((w) => w.id === activeMenuId) ?? null;
+  const updateMutation = useUpdateWorkspace(editingWorkspace?.publicId ?? '');
+
+  const activeMenuWorkspace =
+    workspaces.find((w) => w.publicId === activeMenuId) ?? null;
   const closeMenu = () => setActiveMenuId(null);
 
-  const handleAddWorkspace = () => {
-    if (!newWorkspaceName.trim()) {
-      setIsAddingWorkspace(false);
-      return;
-    }
-    const newWs: Workspace = {
-      id: Date.now().toString(),
-      name: newWorkspaceName.trim(),
-      description: 'New workspace created recently.',
-    };
-    setWorkspaces([newWs, ...workspaces]);
-    setNewWorkspaceName('');
-    setIsAddingWorkspace(false);
-  };
-
   const handleOpenWorkspace = (workspace: Workspace) => {
-    setActiveWorkspace({ id: workspace.id, name: workspace.name });
-    router.push(`/workspaces/${workspace.id}/boards`);
+    setActiveWorkspace({ id: workspace.publicId, name: workspace.name });
+    router.push(`/workspaces/${workspace.publicId}/boards`);
   };
 
-  const handleStartRename = (workspace: Workspace) => {
-    setEditingWorkspace(workspace);
-    setEditingName(workspace.name);
-    closeMenu();
-  };
-
-  const handleCommitRename = () => {
-    if (!editingWorkspace) return;
-    const trimmed = editingName.trim();
-    if (!trimmed) {
-      setEditingWorkspace(null);
-      return;
-    }
-    setWorkspaces((prev) =>
-      prev.map((w) => (w.id === editingWorkspace.id ? { ...w, name: trimmed } : w)),
-    );
+  const openCreate = () => {
     setEditingWorkspace(null);
+    setFormMode('create');
   };
 
-  const handleDelete = (workspace: Workspace) => {
+  const openEdit = (workspace: Workspace) => {
+    setEditingWorkspace(workspace);
+    setFormMode('edit');
     closeMenu();
-    Alert.alert(
-      'Delete workspace',
-      `Are you sure you want to delete "${workspace.name}"? This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            setWorkspaces((prev) => prev.filter((w) => w.id !== workspace.id));
-            clearActiveWorkspace();
-          },
-        },
-      ],
-    );
+  };
+
+  const handleFormSubmit = async (values: WorkspaceFormValues) => {
+    try {
+      if (formMode === 'create') {
+        const created = await createMutation.mutateAsync({
+          name: values.name,
+          description: values.description || undefined,
+        });
+        setFormMode(null);
+        setEditingWorkspace(null);
+        handleOpenWorkspace(created);
+        return;
+      }
+      if (formMode === 'edit' && editingWorkspace) {
+        await updateMutation.mutateAsync({
+          name: values.name,
+          description: values.description || undefined,
+        });
+      }
+      setFormMode(null);
+      setEditingWorkspace(null);
+    } catch (err) {
+      console.error('Workspace save failed', err);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingWorkspace) return;
+    try {
+      await deleteMutation.mutateAsync(deletingWorkspace.publicId);
+      clearActiveWorkspace();
+    } catch (err) {
+      console.error('Workspace delete failed', err);
+    } finally {
+      setDeletingWorkspace(null);
+    }
   };
 
   return (
@@ -101,63 +109,37 @@ export default function HomeScreen() {
         <Button
           size="sm"
           variant="outline"
-          onPress={() => setIsAddingWorkspace(true)}
+          onPress={openCreate}
           className="rounded-full w-10 h-10 p-0"
         >
           <Feather name="plus" size={20} className="text-foreground" />
         </Button>
       </View>
 
-      {isAddingWorkspace && (
-        <Card className="mb-6 p-4 border-primary/20">
-          <Text className="text-lg font-semibold text-foreground mb-3">Create New Workspace</Text>
-          <Input
-            autoFocus
-            placeholder="Workspace Name"
-            value={newWorkspaceName}
-            onChangeText={setNewWorkspaceName}
-            className="mb-4"
-          />
-          <View className="flex-row gap-3">
-            <Button className="flex-1" onPress={handleAddWorkspace}>
-              <Text className="text-white font-semibold">Create</Text>
-            </Button>
-            <Button variant="ghost" className="flex-1" onPress={() => setIsAddingWorkspace(false)}>
-              <Text className="text-muted-foreground">Cancel</Text>
-            </Button>
-          </View>
-        </Card>
-      )}
-
-      <FlatList
-        data={workspaces}
-        keyExtractor={(item) => item.id}
-        showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => {
-          const isEditing = editingWorkspace?.id === item.id;
-          return (
-            <Pressable onPress={() => !isEditing && handleOpenWorkspace(item)}>
+      {isLoading ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator />
+        </View>
+      ) : (
+        <FlatList
+          data={workspaces}
+          keyExtractor={(item) => item.publicId}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={isRefetching} onRefresh={refetch} />
+          }
+          renderItem={({ item }) => (
+            <Pressable onPress={() => handleOpenWorkspace(item)}>
               <Card className="mb-4 p-5 active:bg-muted/10">
                 <View className="flex-row items-center justify-between">
-                  <View className="flex-1">
-                    {isEditing ? (
-                      <Input
-                        autoFocus
-                        value={editingName}
-                        onChangeText={setEditingName}
-                        onBlur={handleCommitRename}
-                        onSubmitEditing={handleCommitRename}
-                        className="mb-1"
-                      />
-                    ) : (
-                      <Text className="text-xl font-semibold text-foreground mb-1">{item.name}</Text>
-                    )}
-                    <Text className="text-sm text-muted-foreground" numberOfLines={1}>
-                      {item.description}
+                  <View className="flex-1 pr-2">
+                    <Text className="text-xl font-semibold text-foreground mb-1">{item.name}</Text>
+                    <Text className="text-sm text-muted-foreground" numberOfLines={2}>
+                      {item.description ?? 'No description.'}
                     </Text>
                   </View>
                   <Pressable
-                    onPress={() => setActiveMenuId(item.id)}
+                    onPress={() => setActiveMenuId(item.publicId)}
                     accessibilityLabel={`Open actions for ${item.name}`}
                     className="p-2"
                   >
@@ -166,14 +148,16 @@ export default function HomeScreen() {
                 </View>
               </Card>
             </Pressable>
-          );
-        }}
-        ListEmptyComponent={
-          <View className="flex-1 items-center justify-center mt-10">
-            <Text className="text-muted-foreground">No workspaces found.</Text>
-          </View>
-        }
-      />
+          )}
+          ListEmptyComponent={
+            <View className="flex-1 items-center justify-center mt-10">
+              <Text className="text-muted-foreground">
+                {isError ? 'Failed to load workspaces.' : 'No workspaces found.'}
+              </Text>
+            </View>
+          }
+        />
+      )}
 
       <Modal
         visible={activeMenuWorkspace !== null}
@@ -183,13 +167,16 @@ export default function HomeScreen() {
       >
         <Pressable
           className="flex-1 justify-end"
-          style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
           onPress={closeMenu}
         >
           <Pressable onPress={(e) => e.stopPropagation()}>
             <View
-              className="bg-background rounded-t-2xl p-4 pb-8 border-t border-border"
+              className="rounded-t-2xl p-4 pb-8"
               style={{
+                backgroundColor: colors.background,
+                borderTopWidth: 1,
+                borderColor: colors.border,
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: -2 },
                 shadowOpacity: 0.15,
@@ -199,21 +186,27 @@ export default function HomeScreen() {
             >
               {activeMenuWorkspace && (
                 <>
-                  <View className="self-center w-10 h-1 rounded-full bg-border mb-4" />
+                  <View
+                    className="self-center w-10 h-1 rounded-full mb-4"
+                    style={{ backgroundColor: colors.border }}
+                  />
                   <Text className="text-base font-semibold text-foreground mb-4">
                     {activeMenuWorkspace.name}
                   </Text>
 
                   <ActionRow
                     icon="edit-2"
-                    label="Rename workspace"
-                    onPress={() => handleStartRename(activeMenuWorkspace)}
+                    label="Edit workspace"
+                    onPress={() => openEdit(activeMenuWorkspace)}
                   />
                   <ActionRow
                     icon="trash-2"
                     label="Delete workspace"
                     destructive
-                    onPress={() => handleDelete(activeMenuWorkspace)}
+                    onPress={() => {
+                      setDeletingWorkspace(activeMenuWorkspace);
+                      closeMenu();
+                    }}
                   />
 
                   <Pressable onPress={closeMenu} className="mt-2 p-3 items-center">
@@ -225,6 +218,35 @@ export default function HomeScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <WorkspaceFormDialog
+        visible={formMode !== null}
+        mode={formMode ?? 'create'}
+        initialValues={
+          editingWorkspace
+            ? { name: editingWorkspace.name, description: editingWorkspace.description ?? '' }
+            : undefined
+        }
+        onClose={() => {
+          setFormMode(null);
+          setEditingWorkspace(null);
+        }}
+        onSubmit={handleFormSubmit}
+      />
+
+      <ConfirmDialog
+        visible={deletingWorkspace !== null}
+        title="Delete workspace"
+        message={
+          deletingWorkspace
+            ? `This will permanently delete "${deletingWorkspace.name}" and all its boards. This action cannot be undone.`
+            : ''
+        }
+        confirmLabel="Delete"
+        destructive
+        onClose={() => setDeletingWorkspace(null)}
+        onConfirm={handleConfirmDelete}
+      />
     </View>
   );
 }
