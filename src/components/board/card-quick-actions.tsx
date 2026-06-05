@@ -219,6 +219,12 @@ export function MemberPickerSheet({
   );
 }
 
+import { Calendar, type DateData } from 'react-native-calendars';
+
+// ... (rest of the imports)
+
+// ... (PickerSheet, LabelPickerSheet, MemberPickerSheet implementations)
+
 export function DueDatePickerSheet({
   visible,
   onClose,
@@ -230,38 +236,54 @@ export function DueDatePickerSheet({
   dueDate: string | null;
   onSetDueDate: (value: string | null) => void;
 }) {
-  const [value, setValue] = useState(dueDate ?? '');
+  const [value, setValue] = useState(dueDate?.split('T')[0] ?? '');
 
   useEffect(() => {
-    if (visible) setValue(dueDate ?? '');
+    if (visible) setValue(dueDate?.split('T')[0] ?? '');
   }, [visible, dueDate]);
 
-  const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(value.trim());
+  const handleDayPress = (day: DateData) => {
+    setValue(day.dateString);
+  };
 
   return (
     <PickerSheet visible={visible} onClose={onClose} title="Due date">
-      <Text className="text-xs text-muted-foreground mb-2">
-        Format: YYYY-MM-DD
-      </Text>
-      <Input
-        placeholder="2026-01-31"
-        value={value}
-        onChangeText={setValue}
-        keyboardType="numbers-and-punctuation"
-        autoCapitalize="none"
-        autoCorrect={false}
-        className="mb-3"
+      <Calendar
+        current={value || new Date().toISOString().split('T')[0]}
+        onDayPress={handleDayPress}
+        markedDates={{
+          [value]: { selected: true, selectedColor: '#60a5fa' },
+        }}
+        theme={{
+          backgroundColor: 'transparent',
+          calendarBackground: 'transparent',
+          textSectionTitleColor: '#b0b0b0',
+          selectedDayBackgroundColor: '#60a5fa',
+          selectedDayTextColor: '#ffffff',
+          todayTextColor: '#60a5fa',
+          dayTextColor: '#d4d4d4',
+          textDisabledColor: '#505050',
+          arrowColor: '#60a5fa',
+          monthTextColor: '#ffffff',
+          indicatorColor: 'blue',
+          textDayFontWeight: '300',
+          textMonthFontWeight: 'bold',
+          textDayHeaderFontWeight: '300',
+          textDayFontSize: 16,
+          textMonthFontSize: 16,
+          textDayHeaderFontSize: 16,
+        }}
       />
-      <View className="flex-row gap-2">
+      <View className="flex-row gap-2 mt-4">
         <Button
           className="flex-1"
           onPress={() => {
-            if (isValidDate) {
-              onSetDueDate(value.trim());
+            if (value) {
+              onSetDueDate(value);
               onClose();
             }
           }}
-          disabled={!isValidDate}
+          disabled={!value}
         >
           <Text className="text-primary-foreground font-semibold">Save</Text>
         </Button>
