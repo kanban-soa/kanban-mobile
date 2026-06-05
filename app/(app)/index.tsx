@@ -50,7 +50,11 @@ export default function HomeScreen() {
   const closeMenu = () => setActiveMenuId(null);
 
   const handleOpenWorkspace = (workspace: Workspace) => {
-    setActiveWorkspace({ id: workspace.publicId, name: workspace.name });
+    setActiveWorkspace({
+      id: workspace.id,
+      publicId: workspace.publicId,
+      name: workspace.name,
+    });
     router.push(`/workspaces/${workspace.publicId}/boards`);
   };
 
