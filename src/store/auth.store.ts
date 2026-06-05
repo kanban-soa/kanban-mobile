@@ -4,21 +4,6 @@ import { login as loginRequest, register as registerRequest } from '~/features/a
 import { clearTokens } from '~/features/auth/tokens';
 import type { AuthSession, AuthStatus, AuthUser, LoginPayload, SignupPayload } from '~/types';
 
-const mockUser: AuthUser = {
-  id: 'dev-user-id',
-  name: 'Gemini Tester',
-  email: 'tester@qmcloud.io.vn',
-  avatarUrl: 'https://i.pravatar.cc/150?u=gemini',
-};
-
-const emptySession: AuthSession = {
-  user: mockUser,
-  tokens: {
-    accessToken: 'mock-access-token',
-    refreshToken: 'mock-refresh-token',
-  },
-};
-
 type AuthState = {
   session: AuthSession | null;
   status: AuthStatus;
@@ -30,12 +15,12 @@ type AuthState = {
 };
 
 export const useAuthStore = create<AuthState>((set) => ({
-  session: emptySession,
-  status: 'authenticated',
+  session: null,
+  status: 'unauthenticated',
   error: null,
   hydrate: async () => {
-    // Keep it authenticated for testing
-    set({ status: 'authenticated', session: emptySession });
+    // In a real app, you'd try to load tokens from storage here.
+    set({ status: 'unauthenticated', session: null });
   },
   signIn: async (payload) => {
     set({ status: 'loading', error: null });
