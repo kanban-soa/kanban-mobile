@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 
 export type ActiveWorkspace = {
-  id: string;
+  id: number;
+  publicId: string;
   name: string;
 };
 

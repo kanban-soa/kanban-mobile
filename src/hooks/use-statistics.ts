@@ -12,34 +12,34 @@ import {
 import type { ActivityQuery, StatisticsRange } from '~/lib/api/types';
 
 export function useWorkspaceStatistics(
-  workspaceId: string | undefined,
+  workspaceId: number | undefined,
   range: StatisticsRange,
 ) {
   return useQuery({
     queryKey: ['statistics', workspaceId, 'summary', range],
-    queryFn: () => getWorkspaceStatistics(workspaceId as string, range),
+    queryFn: () => getWorkspaceStatistics(workspaceId as number, range),
     enabled: !!workspaceId,
   });
 }
 
 export function useSelfPerformance(
-  workspaceId: string | undefined,
+  workspaceId: number | undefined,
   range: StatisticsRange,
 ) {
   return useQuery({
     queryKey: ['statistics', workspaceId, 'self', range],
-    queryFn: () => getSelfPerformance(workspaceId as string, range),
+    queryFn: () => getSelfPerformance(workspaceId as number, range),
     enabled: !!workspaceId,
   });
 }
 
 export function useWorkspaceActivities(
-  workspaceId: string | undefined,
+  workspaceId: number | undefined,
   query: ActivityQuery,
 ) {
   return useQuery({
     queryKey: ['statistics', workspaceId, 'activities', query],
-    queryFn: () => getWorkspaceActivities(workspaceId as string, query),
+    queryFn: () => getWorkspaceActivities(workspaceId as number, query),
     enabled: !!workspaceId,
   });
 }

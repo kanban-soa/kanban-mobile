@@ -3,10 +3,14 @@ import React from "react";
 import { Feather } from "@expo/vector-icons";
 
 import { useColorScheme } from "~/hooks/useColorScheme";
+import { useActiveWorkspaceStore } from "~/store/active-workspace.store";
 
 export default function AppTabLayout() {
   const { colorScheme } = useColorScheme();
   const isDark = (colorScheme ?? "light") === "dark";
+  const { activeWorkspace } = useActiveWorkspaceStore();
+
+  const workspaceId = activeWorkspace?.publicId;
 
   return (
     <Tabs
@@ -38,6 +42,7 @@ export default function AppTabLayout() {
           tabBarIcon: ({ color, size }) => (
             <Feather name="layout" size={size ?? 20} color={color} />
           ),
+          href: workspaceId ? `/workspaces/${workspaceId}/boards` : null,
         }}
       />
       <Tabs.Screen
@@ -47,6 +52,7 @@ export default function AppTabLayout() {
           tabBarIcon: ({ color, size }) => (
             <Feather name="users" size={size ?? 20} color={color} />
           ),
+          href: workspaceId ? `/workspaces/${workspaceId}/members` : null,
         }}
       />
       <Tabs.Screen
@@ -56,6 +62,7 @@ export default function AppTabLayout() {
           tabBarIcon: ({ color, size }) => (
             <Feather name="bar-chart-2" size={size ?? 20} color={color} />
           ),
+          href: workspaceId ? "/statistic" : null,
         }}
       />
       <Tabs.Screen

@@ -192,7 +192,7 @@ export default function StatisticOverviewScreen() {
                 {recentActivities.map((a) => {
                   const verb = activityVerb(a.actionType);
                   const target = a.metadata.title ?? a.metadata.name ?? a.entityId;
-                  const actor = (a.metadata.actor as { name?: string })?.name ?? 'Someone';
+                  const actor = (a.metadata.actor as { name?: string })?.username ?? 'Someone';
                   return (
                     <View key={a.publicId} className="flex-row items-center gap-3">
                       <View className="h-9 w-9 items-center justify-center rounded-full bg-muted">

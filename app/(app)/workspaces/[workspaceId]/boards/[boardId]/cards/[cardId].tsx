@@ -101,7 +101,7 @@ export default function CardDetailScreen() {
     () => (card?.labels ?? []).map((l) => l.publicId ?? l.id),
     [card],
   );
-  const cardMemberIds = card?.members ?? [];
+  const cardMemberIds = card?.assignedWorkspaceMemberPublicIds ?? [];
 
   const [titleDraft, setTitleDraft] = useState('');
   const [descriptionDraft, setDescriptionDraft] = useState('');
@@ -293,6 +293,17 @@ export default function CardDetailScreen() {
                     <Text className="text-sm font-medium text-foreground">{m.name}</Text>
                     <Text className="text-xs text-muted-foreground">{m.email}</Text>
                   </View>
+                  <Pressable
+                    onPress={() =>
+                      unassignMemberMutation.mutate({
+                        cardId: activeCardId,
+                        memberId: m.id,
+                      })
+                    }
+                    className="p-2"
+                  >
+                    <Feather name="x" size={16} className="text-muted-foreground" />
+                  </Pressable>
                 </View>
               ))}
             </View>

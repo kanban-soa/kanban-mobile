@@ -32,11 +32,11 @@ function buildSearchParams(input: Record<string, string | number | undefined>) {
 }
 
 export async function getWorkspaceStatistics(
-  workspaceId: string,
+  workspaceId: number,
   range: StatisticsRange,
 ): Promise<StatisticsSummary> {
   const data = await api
-    .get(STATISTICS.WORKSPACE(workspaceId), {
+    .get(STATISTICS.WORKSPACE(String(workspaceId)), {
       prefixUrl: statsBaseUrl,
       searchParams: { range },
     })
@@ -45,11 +45,11 @@ export async function getWorkspaceStatistics(
 }
 
 export async function getSelfPerformance(
-  workspaceId: string,
+  workspaceId: number,
   range: StatisticsRange,
 ): Promise<StatisticsSelfPerformance> {
   const data = await api
-    .get(STATISTICS.SELF_PERFORMANCE(workspaceId), {
+    .get(STATISTICS.SELF_PERFORMANCE(String(workspaceId)), {
       prefixUrl: statsBaseUrl,
       searchParams: { range },
     })
@@ -58,11 +58,11 @@ export async function getSelfPerformance(
 }
 
 export async function getWorkspaceActivities(
-  workspaceId: string,
+  workspaceId: number,
   query: ActivityQuery,
 ): Promise<PagedActivityResponse> {
   const data = await api
-    .get(STATISTICS.ACTIVITIES(workspaceId), {
+    .get(STATISTICS.ACTIVITIES(String(workspaceId)), {
       prefixUrl: statsBaseUrl,
       searchParams: buildSearchParams(query),
     })
@@ -71,11 +71,11 @@ export async function getWorkspaceActivities(
 }
 
 export async function exportWorkspaceStatistics(
-  workspaceId: string,
+  workspaceId: number,
   range: StatisticsRange,
   format: 'csv' | 'json',
 ): Promise<Blob> {
-  const response = await api.get(STATISTICS.EXPORT(workspaceId), {
+  const response = await api.get(STATISTICS.EXPORT(String(workspaceId)), {
     prefixUrl: statsBaseUrl,
     searchParams: { range, format },
   });

@@ -40,6 +40,9 @@ const darkVars = vars({
   '--radius': '12px',
 });
 
+import { useAuthStore } from '~/store/auth.store';
+import { useSegments, useRouter } from 'expo-router';
+
 const lightTheme = {
   ...DefaultTheme,
   colors: {
@@ -63,6 +66,44 @@ const darkTheme = {
     primary: 'hsl(0 0% 98%)',
   },
 };
+
+function InitialLayout() {
+  const status = useAuthStore((state) => state.status);
+  const hydrate = useAuthStore((state) => state.hydrate);
+  const router = useRouter();
+  const segments = useSegments();
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    hydrate().then(() => setIsHydrated(true));
+  }, [hydrate]);
+
+  useEffect(() => {
+    if (!isHydrated) {
+      return;
+    }
+
+    const inAuthGroup = segments[0] === '(auth)';
+
+    if (status === 'authenticated' && inAuthGroup) {
+      router.replace('/');
+    } else if (status === 'unauthenticated' && !inAuthGroup) {
+      router.replace('/login');
+    }
+  }, [status, segments, isHydrated, router]);
+
+  if (!isHydrated) {
+    return null; // or a loading spinner
+  }
+
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(app)" />
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+    </Stack>
+  );
+}
 
 export default function RootLayout() {
   const { colorScheme } = useColorScheme();
@@ -91,10 +132,7 @@ export default function RootLayout() {
             style={themeVars}
           >
             <ThemeProvider value={theme}>
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="(auth)" />
-                <Stack.Screen name="(app)" />
-              </Stack>
+              <InitialLayout />
               <StatusBar style={activeColorScheme === 'dark' ? 'light' : 'dark'} />
             </ThemeProvider>
           </View>

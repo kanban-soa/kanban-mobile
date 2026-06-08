@@ -91,7 +91,7 @@ export default function ActivityLogScreen() {
           renderItem={({ item }) => {
             const [, verb] = item.actionType.split('.');
             const actor =
-              (item.metadata.actor as { name?: string })?.name ?? 'Someone';
+              (item.metadata.actor as { name?: string })?.username ?? 'Someone';
             const target =
               item.metadata.title ?? item.metadata.name ?? item.entityId;
             const context =
